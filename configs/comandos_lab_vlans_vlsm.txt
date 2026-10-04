@@ -1,0 +1,151 @@
+LAB DE CONFIGURACAO BASICA DE REDE COM VLANS E VLSM
+Comandos completos para montar o cenario do zero
+Gabriel André de Lima Silva, Redes I, Prof. Fred Sauer
+
+Use este arquivo so se o .pkt nao abrir na sua versao do Packet Tracer.
+Ligacoes: Roteador G0/0/0 na G0/1 do SW3; SW1 F0/1 na F0/1 do SW3;
+SW3 F0/3 na F0/3 do SW2 (cabo cruzado entre switches, direto no resto).
+Em SW1 e SW2: F0/11 PC da VLAN 10, F0/18 PC da VLAN 20, F0/6 PC da VLAN 30.
+
+ENDERECAMENTO (bloco privado 192.168.0.0/22, VLSM)
+VLAN 30 visita     192.168.0.0/23   255.255.254.0     GW 192.168.0.1
+VLAN 20 aluno      192.168.2.0/24   255.255.255.0     GW 192.168.2.1
+VLAN 10 professor  192.168.3.0/26   255.255.255.192   GW 192.168.3.1
+
+
+========== SW1 ==========
+enable
+configure terminal
+hostname SW1
+vlan 10
+name professor
+exit
+vlan 20
+name aluno
+exit
+vlan 30
+name visita
+exit
+interface f0/11
+switchport mode access
+switchport access vlan 10
+exit
+interface f0/18
+switchport mode access
+switchport access vlan 20
+exit
+interface f0/6
+switchport mode access
+switchport access vlan 30
+exit
+interface f0/1
+switchport mode trunk
+switchport trunk allowed vlan 10,20,30
+end
+copy running-config startup-config
+
+
+========== SW2 ==========
+enable
+configure terminal
+hostname SW2
+vlan 10
+name professor
+exit
+vlan 20
+name aluno
+exit
+vlan 30
+name visita
+exit
+interface f0/11
+switchport mode access
+switchport access vlan 10
+exit
+interface f0/18
+switchport mode access
+switchport access vlan 20
+exit
+interface f0/6
+switchport mode access
+switchport access vlan 30
+exit
+interface f0/3
+switchport mode trunk
+switchport trunk allowed vlan 10,20,30
+end
+copy running-config startup-config
+
+
+========== SW3 ==========
+enable
+configure terminal
+hostname SW3
+vlan 10
+name professor
+exit
+vlan 20
+name aluno
+exit
+vlan 30
+name visita
+exit
+interface f0/1
+switchport mode trunk
+switchport trunk allowed vlan 10,20,30
+exit
+interface f0/3
+switchport mode trunk
+switchport trunk allowed vlan 10,20,30
+exit
+interface g0/1
+switchport mode trunk
+switchport trunk allowed vlan 10,20,30
+end
+copy running-config startup-config
+
+
+========== ROTEADOR (ISR 4331) ==========
+enable
+configure terminal
+interface g0/0/0.10
+encapsulation dot1Q 10
+ip address 192.168.3.1 255.255.255.192
+exit
+interface g0/0/0.20
+encapsulation dot1Q 20
+ip address 192.168.2.1 255.255.255.0
+exit
+interface g0/0/0.30
+encapsulation dot1Q 30
+ip address 192.168.0.1 255.255.254.0
+exit
+interface g0/0/0
+no shutdown
+end
+copy running-config startup-config
+
+
+========== PCs (Desktop > IP Configuration > Static) ==========
+PC1  192.168.3.10  255.255.255.192  gateway 192.168.3.1   (SW1 F0/11, VLAN 10)
+PC2  192.168.2.10  255.255.255.0    gateway 192.168.2.1   (SW1 F0/18, VLAN 20)
+PC3  192.168.0.10  255.255.254.0    gateway 192.168.0.1   (SW1 F0/6,  VLAN 30)
+PC4  192.168.3.11  255.255.255.192  gateway 192.168.3.1   (SW2 F0/11, VLAN 10)
+PC5  192.168.2.11  255.255.255.0    gateway 192.168.2.1   (SW2 F0/18, VLAN 20)
+PC6  192.168.1.10  255.255.254.0    gateway 192.168.0.1   (SW2 F0/6,  VLAN 30)
+
+
+========== NOTAS NO CENARIO (ferramenta Place Note) ==========
+Ao lado de PC1 e PC4: Professor / VLAN 10 / subrede 192.168.3.0/26 / 255.255.255.192 / GW 192.168.3.1
+Ao lado de PC2 e PC5: Aluno / VLAN 20 / subrede 192.168.2.0/24 / 255.255.255.0 / GW 192.168.2.1
+Ao lado de PC3 e PC6: Visita / VLAN 30 / subrede 192.168.0.0/23 / 255.255.254.0 / GW 192.168.0.1
+
+
+========== TESTES RAPIDOS ==========
+1. Espere os LEDs ficarem verdes (ou clique em Fast Forward Time algumas vezes).
+2. No PC1: ping 192.168.3.11 (mesma VLAN, resposta com TTL=128)
+3. No PC1: ping 192.168.2.11 (outra VLAN, o primeiro pode dar timeout, depois TTL=127)
+4. No PC1: tracert 192.168.2.11 (saltos: 192.168.3.1 e 192.168.2.11)
+5. No PC3: tracert 192.168.1.10 (um salto so: mesma VLAN, mesmo com o 3o octeto diferente)
+6. Nos switches: show vlan brief e show interfaces trunk
+7. No roteador: show ip interface brief e show ip route

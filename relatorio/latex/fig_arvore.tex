@@ -1,0 +1,20 @@
+\begin{tikzpicture}[every node/.append style={execute at begin node=\setstretch{1.05}}, font=\footnotesize, x=1cm, y=1cm,
+  bloco/.style={draw, rounded corners=1.5pt, align=center, inner sep=3pt, fill=white, minimum width=2.7cm, minimum height=0.85cm},
+  folha/.style={bloco, line width=1.1pt},
+  livre/.style={bloco, dashed, text=black!55},
+  ramo/.style={draw=black!55}]
+  \foreach \y/\p/\t in {0/22/1024, -1.6/23/512, -3.2/24/256, -4.8/25/128, -6.4/26/64}
+    \node[font=\scriptsize, text=black!60, align=center] at (-7.1,\y) {/\p\\\t\ end.};
+  \draw[black!25] (-6.45,0.45) -- (-6.45,-6.85);
+  \node[bloco] (r) at (0,0) {192.168.0.0/22\\bloco escolhido};
+  \node[folha, draw=vvisi, fill=vvisi!8] (v) at (-3.9,-1.6) {192.168.0.0/23\\\textbf{Visita, VLAN 30}};
+  \node[bloco] (b1) at (3.2,-1.6) {192.168.2.0/23};
+  \node[folha, draw=valun, fill=valun!8] (a) at (0.4,-3.2) {192.168.2.0/24\\\textbf{Alunos, VLAN 20}};
+  \node[bloco] (b2) at (5.2,-3.2) {192.168.3.0/24};
+  \node[bloco] (b3) at (3.0,-4.8) {192.168.3.0/25};
+  \node[livre] (l1) at (7.2,-4.8) {192.168.3.128/25\\livre};
+  \node[folha, draw=vprof, fill=vprof!8] (p) at (0.8,-6.4) {192.168.3.0/26\\\textbf{Professor, VLAN 10}};
+  \node[livre] (l2) at (4.9,-6.4) {192.168.3.64/26\\livre};
+  \foreach \a/\b/\bit in {r/v/0, r/b1/1, b1/a/0, b1/b2/1, b2/b3/0, b2/l1/1, b3/p/0, b3/l2/1}
+    \draw[ramo] (\a.south) -- node[fill=white, inner sep=1.2pt, font=\scriptsize\bfseries, text=hostblue] {\bit} (\b.north);
+\end{tikzpicture}

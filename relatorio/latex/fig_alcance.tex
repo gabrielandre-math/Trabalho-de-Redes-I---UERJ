@@ -1,0 +1,36 @@
+\begin{tikzpicture}[every node/.append style={execute at begin node=\setstretch{1.05}}, font=\footnotesize, x=1.12cm, y=1.05cm,
+  dev/.style={draw, rounded corners=1pt, minimum width=0.86cm, minimum height=0.46cm, inner sep=1pt, fill=white},
+  recebe/.style={dev, fill=red!18, draw=red!70!black, line width=0.9pt},
+  apagado/.style={dev, draw=black!30, text=black!35},
+  origem/.style={dev, line width=1.3pt, fill=black!8},
+  bc/.style={red!70!black, line width=1.6pt},
+  fio/.style={black!25, line width=0.8pt}]
+  % monta a mini topologia; #1 = deslocamento, #2 = com VLAN (1) ou sem (0)
+  \newcommand{\mini}[2]{%
+    \begin{scope}[shift={(#1,0)}]
+      \coordinate (r) at (3.3,0); \coordinate (s3) at (3.3,-1.1);
+      \coordinate (s1) at (1.6,-2.1); \coordinate (s2) at (5.0,-2.1);
+      \coordinate (p1) at (0.5,-3.3); \coordinate (p2) at (1.6,-3.3); \coordinate (p3) at (2.7,-3.3);
+      \coordinate (p4) at (3.9,-3.3); \coordinate (p5) at (5.0,-3.3); \coordinate (p6) at (6.1,-3.3);
+      \ifnum#2=0
+        \foreach \a/\b in {r/s3, s3/s1, s3/s2, s1/p1, s1/p2, s1/p3, s2/p4, s2/p5, s2/p6} \draw[bc] (\a) -- (\b);
+        \node[recebe] at (r) {R};
+        \foreach \p/\n in {p2/PC2, p3/PC3, p4/PC4, p5/PC5, p6/PC6} \node[recebe] at (\p) {\n};
+      \else
+        \foreach \a/\b in {s1/p2, s1/p3, s2/p5, s2/p6} \draw[fio] (\a) -- (\b);
+        \foreach \a/\b in {r/s3, s3/s1, s3/s2, s1/p1, s2/p4} \draw[bc] (\a) -- (\b);
+        \node[recebe] at (r) {.10};
+        \node[recebe] at (p4) {PC4};
+        \foreach \p/\n in {p2/PC2, p3/PC3, p5/PC5, p6/PC6} \node[apagado] at (\p) {\n};
+      \fi
+      \node[origem] at (p1) {PC1};
+      \node[dev] at (s3) {SW3}; \node[dev] at (s1) {SW1}; \node[dev] at (s2) {SW2};
+    \end{scope}}
+  \mini{0}{0}
+  \mini{8.2}{1}
+  \node[font=\small\bfseries] at (3.3,0.75) {(a) sem VLANs};
+  \node[font=\small\bfseries] at (11.5,0.75) {(b) com as VLANs do laboratório};
+  \node[align=center] at (3.3,-4.25) {o ARP do PC1 chega a \textbf{6} equipamentos:\\os outros 5 PCs e o roteador};
+  \node[align=center] at (11.5,-4.25) {o ARP do PC1 chega a \textbf{2} equipamentos:\\PC4 e a subinterface G0/0/0.10};
+  \draw[black!20, dashed] (7.55,1.0) -- (7.55,-4.7);
+\end{tikzpicture}

@@ -1,0 +1,33 @@
+\begin{tikzpicture}[every node/.append style={execute at begin node=\setstretch{1.05}}, font=\footnotesize, x=1cm, y=1cm,
+  sub/.style={draw, rounded corners=1.5pt, align=left, inner sep=3pt, fill=white, text width=2.55cm, line width=0.8pt}]
+  % (a) visao fisica
+  \node[font=\small\bfseries] at (1.5,1.35) {(a) visão física};
+  \coordinate (R) at (1.5,0.3); \coordinate (S) at (1.5,-2.9);
+  \tronco{R}{S}
+  \pic at (R) {rt}; \node[above=0.38cm of R] {Roteador};
+  \pic at (S) {sw}; \node[below=0.27cm of S] {SW3};
+  \node[porta, right=3pt] at ($(R)!0.25!(S)$) {G0/0/0};
+  \node[porta, right=3pt] at ($(R)!0.85!(S)$) {Gig0/1};
+  \node[align=center, font=\scriptsize, text=black!70, fill=white, inner sep=1pt] at ($(R)!0.55!(S)$) {um cabo,\\três VLANs};
+  \draw[black!25, dashed] (3.4,1.5) -- (3.4,-4.0);
+  % (b) visao logica
+  \node[font=\small\bfseries] at (9.3,1.35) {(b) visão lógica};
+  \coordinate (RL) at (4.4,-1.3);
+  \node[sub, draw=vprof, anchor=west] (s10) at (5.6,0.25) {G0/0/0.10\\192.168.3.1 /26};
+  \node[sub, draw=valun, anchor=west] (s20) at (5.6,-1.3) {G0/0/0.20\\192.168.2.1 /24};
+  \node[sub, draw=vvisi, anchor=west] (s30) at (5.6,-2.85) {G0/0/0.30\\192.168.0.1 /23};
+  \foreach \s in {s10,s20,s30} \draw[black!60] (RL) -- (\s.west);
+  \pic at (RL) {rt}; \node[below=0.42cm of RL] {Roteador};
+  % uma rede por VLAN
+  \foreach \s/\c/\y/\rede/\pa/\pb in {s10/vprof/0.25/{VLAN 10: 192.168.3.0/26}/PC1/PC4,
+                                       s20/valun/-1.3/{VLAN 20: 192.168.2.0/24}/PC2/PC5,
+                                       s30/vvisi/-2.85/{VLAN 30: 192.168.0.0/23}/PC3/PC6} {
+    \draw[\c, line width=2.2pt] (9.2,\y-0.2) -- (15.4,\y-0.2);
+    \draw[\c, line width=1pt] (\s.east) -- (9.2,\y-0.2);
+    \node[anchor=north west, text=\c, font=\scriptsize\bfseries] at (9.25,\y-0.3) {\rede};
+    \draw[\c, line width=0.8pt] (13.2,\y+0.11) -- (13.2,\y-0.2);
+    \draw[\c, line width=0.8pt] (14.8,\y+0.11) -- (14.8,\y-0.2);
+    \pic at (13.2,\y+0.35) {pc}; \node[font=\scriptsize, anchor=north] at (13.2,\y-0.28) {\pa};
+    \pic at (14.8,\y+0.35) {pc}; \node[font=\scriptsize, anchor=north] at (14.8,\y-0.28) {\pb};
+  }
+\end{tikzpicture}

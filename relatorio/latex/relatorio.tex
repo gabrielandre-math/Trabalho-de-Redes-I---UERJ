@@ -1,0 +1,974 @@
+\input{preamble}
+
+\begin{document}
+\hyphenation{TANENBAUM WETHERALL KUROSE PLUMMER POSTEL SAUER REKHTER PUMMILL MANNING MOGUL FULLER CISCO SYSTEMS}
+\renewcommand{\contentsname}{SUMÁRIO}
+\renewcommand{\listfigurename}{LISTA DE FIGURAS}
+\renewcommand{\listtablename}{LISTA DE TABELAS}
+
+% =================================================================== CAPA
+\begin{titlepage}
+\thispagestyle{empty}
+\centering
+\vspace*{-1.2cm}
+\includegraphics[width=3.55cm]{logo_uerj.pdf}\par
+\vspace{1.1cm}
+{\bfseries UNIVERSIDADE DO ESTADO DO RIO DE JANEIRO\par\vspace{0.25cm}
+CAMPUS ZONA OESTE (UERJ-ZO)\par\vspace{0.25cm}
+CURSO DE CIÊNCIA DA COMPUTAÇÃO\par}
+\vspace{3.6cm}
+GABRIEL ANDRÉ DE LIMA SILVA\par
+\vspace{3.6cm}
+{\Large\bfseries LAB DE CONFIGURAÇÃO BÁSICA DE REDE\\[2pt] COM VLANS E VLSM\par}
+\vspace{0.45cm}
+Endereçamento VLSM, VLANs, troncos 802.1Q e roteamento\\ router on a stick no Packet Tracer\par
+\vspace{1.4cm}
+\hspace*{6.8cm}\begin{minipage}{6.5cm}\small\raggedright
+Atividade Pontuada de Redes I\\[4pt]
+Professor: Fred Sauer
+\end{minipage}
+\vfill
+{\bfseries RIO DE JANEIRO\par\vspace{0.25cm}2026\par}
+\end{titlepage}
+
+% ===================================================== LISTAS E SUMARIO
+\setcounter{page}{2}
+\begingroup
+\setstretch{1.0}\setlength{\parskip}{0pt}
+\listoffigures
+\clearpage
+\listoftables
+\clearpage
+\tableofcontents
+\endgroup
+\clearpage
+
+% ============================================================== INTRODUCAO
+\secao{INTRODUÇÃO}
+
+Este relatório documenta a montagem do \emph{Lab de configuração básica de rede com VLANs e VLSM} (SAUER, [2023?]) no Cisco Packet Tracer. O cenário é um ambiente educacional com três grupos de usuários, cada um em uma VLAN: Professor (VLAN 10) com 60 pontos de rede, Alunos (VLAN 20) com 200 pontos e Visita (VLAN 30) com 500 pontos. A topologia tem três switches 2960 (SW1, SW2 e SW3), um roteador ISR 4331 e seis PCs, dois de cada VLAN.
+
+O objetivo é definir a melhor distribuição de endereços privados para as três VLANs, separar os grupos em VLANs nos switches e permitir a comunicação entre elas por meio do roteador, com a técnica \emph{router on a stick}. O relatório apresenta os cálculos do endereçamento em binário, os comandos usados em cada equipamento e os testes que mostram o funcionamento da rede. O arquivo do Packet Tracer (.pkt) foi entregue junto com este documento e já está com todas as configurações salvas.
+
+% ============================================================ FUNDAMENTACAO
+\secao{FUNDAMENTAÇÃO}
+
+\subsecao{VLAN e domínio de broadcast}
+
+Um switch sem VLAN forma um único domínio de broadcast: um quadro enviado para o endereço FF:FF:FF:FF:FF:FF sai por todas as portas, exceto a de entrada. A VLAN divide o switch em redes locais lógicas. Um quadro que entra em uma porta da VLAN 10 só sai por portas que também são da VLAN 10, de modo que o broadcast fica restrito ao grupo (TANENBAUM; WETHERALL, 2011, seção 4.8.5; SAUER, [s. d.]b). Como cada VLAN é uma rede separada, ela recebe uma subrede IP própria, e o tráfego entre VLANs diferentes precisa passar por um roteador.
+
+\subsecao{Tabela CAM e aprendizado do switch}
+
+O switch decide por qual porta encaminhar cada quadro consultando a sua tabela CAM, que associa endereço MAC, VLAN e porta. Essa tabela é preenchida automaticamente, por aprendizado: quando um quadro chega, o switch anota o MAC de origem, a VLAN e a porta por onde ele entrou (TANENBAUM; WETHERALL, 2011, seção 4.8.2; KUROSE; ROSS, 2021, cap. 6). Se o MAC de destino já está na tabela, o quadro sai só pela porta anotada. Se não está, ou se o destino é o broadcast, o quadro é inundado por todas as portas da mesma VLAN, menos a de entrada. Como a tabela é separada por VLAN, o mesmo MAC pode aparecer em mais de uma VLAN, o que acontece com o MAC do roteador neste laboratório.
+
+As entradas expiram depois de um tempo sem uso, 300 segundos por padrão nos switches Cisco (CISCO SYSTEMS, [s. d.]a). O roteiro pede que o cenário seja reiniciado antes do teste para esvaziar as tabelas CAM. O reinício também esvazia as tabelas ARP, e assim o modo simulação mostra toda a troca de mensagens desde a primeira pergunta ARP.
+
+\subsecao{Porta de acesso e tronco 802.1Q}
+
+A porta de acesso pertence a uma única VLAN e trabalha com quadros Ethernet comuns, sem marcação. É nela que ficam os PCs, que enviam e recebem quadros sem tag e não precisam saber a qual VLAN pertencem. O tronco é o enlace que transporta várias VLANs ao mesmo tempo, como os enlaces entre os switches e entre o SW3 e o roteador. Para o equipamento do outro lado saber de qual VLAN veio cada quadro, o padrão IEEE 802.1Q insere uma marca (\emph{tag}) de 4 bytes logo depois do MAC de origem (IEEE, 2018; TANENBAUM; WETHERALL, 2011, seção 4.8.5), como mostra a Figura~\ref{fig:quadro}.
+
+\begin{figure}[H]
+\captionsetup{position=top}
+\caption{quadro Ethernet com a tag 802.1Q}\label{fig:quadro}
+\centering
+\input{fig_quadro}
+\fontebase{IEEE (2018) e Tanenbaum e Wetherall (2011)}
+\end{figure}
+
+O TPID vale 0x8100 e ocupa a posição em que um quadro comum teria o campo Tipo. É assim que o equipamento percebe que o quadro tem tag; o Tipo verdadeiro (0x0800 para IPv4, 0x0806 para ARP) vem logo depois da tag. Nos 2 bytes seguintes, chamados de TCI, ficam a prioridade (PCP, 3 bits), o bit DEI e o identificador da VLAN (VID, 12 bits). Com 12 bits é possível representar 2\textsuperscript{12} = 4096 valores, mas o 0 e o 4095 são reservados, por isso os números válidos de VLAN vão de 1 a 4094, o mesmo intervalo que aparece no roteiro para o \texttt{show vlan id}.
+
+A parte de baixo da Figura~\ref{fig:quadro} mostra os bits de um quadro da VLAN 10: 10 = 8 + 2 = 1010, que ocupa o fim dos 12 bits do VID. Nas outras VLANs do laboratório o VID fica 0000 0001 0100 (20 = 16 + 4) e 0000 0001 1110 (30 = 16 + 8 + 4 + 2). Como a tag muda o conteúdo do quadro, o FCS é recalculado, e o tamanho máximo do quadro passa de 1518 para 1522 bytes.
+
+Os quadros da VLAN nativa atravessam o tronco sem tag. No equipamento Cisco a VLAN nativa padrão é a 1, e o roteiro pede que ela não seja alterada (SAUER, [2023?]). O comando \texttt{switchport trunk allowed vlan 10,20,30} limita o tronco às três VLANs do cenário, já que por padrão o tronco aceita todas (CISCO SYSTEMS, [s. d.]d).
+
+\subsecao{Roteamento entre VLANs com router on a stick}
+
+Na técnica \emph{router on a stick} o roteador usa uma única interface física ligada a uma porta de tronco do switch. Essa interface é dividida em subinterfaces, uma por VLAN. Cada subinterface recebe o comando \texttt{encapsulation dot1Q} com o número da VLAN e o endereço IP que vai ser o gateway daquela VLAN (CISCO SYSTEMS, [s. d.]b). Quando chega um quadro com tag 10, ele é entregue à subinterface G0/0/0.10. Quando o roteador envia um pacote para a VLAN 20, o quadro sai pela G0/0/0.20 com tag 20. Para o roteador, cada subinterface é uma interface comum ligada a uma rede diferente, como mostra a visão lógica da Figura~\ref{fig:logica}, na seção 2.1.
+
+O mesmo cabo leva o pacote duas vezes, na ida até o roteador e na volta para o switch. Essa é a principal limitação da técnica quando o tráfego entre VLANs é grande. O roteiro lembra que a comunicação entre VLANs também poderia ser feita com interfaces separadas de um roteador ou com um switch de camada 3, mas essas alternativas ficam fora do escopo deste laboratório (SAUER, [2023?]).
+
+\subsecao{ARP e o papel do gateway}
+
+Antes de enviar um pacote, o host faz o AND entre o IP de destino e a sua própria máscara. Se o resultado for igual ao endereço da sua rede, o destino está na mesma subrede e o host pergunta via ARP o MAC do próprio destino. Se for diferente, o pacote vai para o gateway, e o ARP pergunta o MAC do gateway. A pergunta do ARP é um broadcast e a resposta é unicast (PLUMMER, 1982; TANENBAUM; WETHERALL, 2011, seção 5.6.4). Com VLANs esse broadcast só chega aos equipamentos da mesma VLAN, e é essa redução de broadcast que o roteiro pede para observar no modo simulação. A Figura~\ref{fig:decisao} resume a decisão do host.
+
+\begin{figure}[H]
+\captionsetup{position=top}
+\caption{decisão do host antes de enviar um pacote}\label{fig:decisao}
+\centering
+\input{fig_decisao}
+\fontebase{Plummer (1982) e Tanenbaum e Wetherall (2011)}
+\end{figure}
+
+Depois da primeira resposta, o mapeamento fica guardado na tabela ARP do host, e as mensagens seguintes não precisam perguntar de novo. Além disso, quem recebe uma pergunta ARP dirigida a si já guarda o MAC de quem perguntou (PLUMMER, 1982). É por isso que, no teste da seção 4.6, a volta do ping não precisa de nenhum ARP.
+
+\subsecao{VLSM e endereços privados}
+
+Com VLSM cada subrede recebe a máscara do seu tamanho, em vez de todas usarem a máscara da maior (PUMMILL; MANNING, 1995). Uma subrede com \textit{h} bits de host tem 2\textsuperscript{\textit{h}} endereços, dos quais 2\textsuperscript{\textit{h}} − 2 são utilizáveis, porque o primeiro identifica a subrede e o último é o broadcast (MOGUL; POSTEL, 1985; TANENBAUM; WETHERALL, 2011, seção 5.6.2). Os endereços privados vêm da RFC 1918: 10.0.0.0/8, 172.16.0.0/12 e 192.168.0.0/16. Eles não são roteados na internet e podem ser usados livremente em redes internas (REKHTER et al., 1996; SAUER, [s. d.]c).
+
+% ================================================================== METODO
+\secao{MÉTODO}
+
+O cenário foi montado no Cisco Packet Tracer, versão 8.2.2 (CISCO SYSTEMS, 2024), seguindo a ordem do roteiro.
+
+A teoria segue o livro-texto da disciplina (TANENBAUM; WETHERALL, 2011), cujos capítulos 4 e 5 são a base dos slides das aulas 3 e 4 (SAUER, [s. d.]b; SAUER, [s. d.]c), com consulta também a Kurose e Ross (2021). Os protocolos foram conferidos nas RFCs e no padrão IEEE 802.1Q, e os comandos e valores padrão dos equipamentos, na documentação da Cisco para o Catalyst 2960 e para o roteamento entre VLANs.
+
+Para o endereçamento usei o mesmo procedimento nas três VLANs. Para cada uma, calculei o menor número de bits de host (\textit{h}) que satisfaz 2\textsuperscript{\textit{h}} − 2 ≥ pontos + 1, porque o gateway também ocupa um endereço da subrede. O prefixo é 32 − \textit{h}. Depois somei os tamanhos dos blocos, escolhi a menor potência de 2 que comporta a soma e aloquei as subredes da maior para a menor, a partir do início do bloco. Cada subrede começa no endereço seguinte ao broadcast da anterior (broadcast + 1, somado em binário), e cada resultado foi conferido com a operação AND.
+
+Na configuração, segui a sequência do roteiro: criação das VLANs nos três switches, portas de acesso, troncos, subinterfaces do roteador, endereços dos PCs e gravação com \texttt{copy running-config startup-config} em todos os equipamentos com IOS. A subrede e o gateway de cada VLAN ficaram registrados como comentário no próprio cenário.
+
+Nos testes, conferi as VLANs, os troncos e o roteador com os comandos \texttt{show}, testei o ping entre todos os pares de PCs e usei o tracert entre VLANs. Por último reiniciei o cenário para esvaziar as tabelas CAM e acompanhei no modo simulação um ping do PC1 para o PC5, observando os broadcasts ARP e a passagem pelo roteador.
+
+O arquivo .pkt, as configurações dos equipamentos, as telas dos testes e os fontes deste relatório estão publicados no GitHub:\\
+\url{https://github.com/gabrielandre-math/Trabalho-de-Redes-I---UERJ}
+
+Este relatório foi feito em LaTeX e compilado com XeLaTeX. Todos os diagramas foram desenhados em TikZ, e as tabelas com contas em binário foram conferidas por um pequeno script, para evitar erros de digitação.
+
+% ============================================================= ENDERECAMENTO
+\secao{1 ENDEREÇAMENTO}
+
+\subsecao{1.1 Tamanho das subredes}
+
+O roteiro informa a quantidade de pontos de rede de cada VLAN. Além dos PCs, cada subrede precisa de mais um endereço para o gateway, que é a subinterface do roteador. Por isso fiz a conta com pontos + 1. Para cada VLAN calculei o menor número de bits de host \textit{h} que satisfaz 2\textsuperscript{\textit{h}} − 2 ≥ pontos + 1, e o prefixo é 32 − \textit{h}.
+
+\begin{table}[H]
+\caption{tamanho das subredes}\label{tab:tamanho}
+\small\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{@{}lccc>{\centering\arraybackslash}Xccc@{}}
+\toprule
+\textbf{Setor} & \textbf{VLAN} & \textbf{Pontos} & \makecell{\textbf{Endereços}\\\textbf{ocupados}} & \textbf{Cálculo} & \textbf{h} & \textbf{Prefixo} & \makecell{\textbf{Bloco}\\\textbf{(2\textsuperscript{\textit{h}})}}\\
+\midrule
+Visita & 30 & 500 & 501 & \makecell{2\textsuperscript{8} − 2 = 254 < 501\\2\textsuperscript{9} − 2 = 510 ≥ 501} & 9 & /23 & 512\\[3pt]
+Alunos & 20 & 200 & 201 & \makecell{2\textsuperscript{7} − 2 = 126 < 201\\2\textsuperscript{8} − 2 = 254 ≥ 201} & 8 & /24 & 256\\[3pt]
+Professor & 10 & 60 & 61 & \makecell{2\textsuperscript{5} − 2 = 30 < 61\\2\textsuperscript{6} − 2 = 62 ≥ 61} & 6 & /26 & 64\\
+\bottomrule
+\end{tabularx}
+\fonte
+\end{table}
+
+Incluir o gateway não alterou nenhum prefixo: sem ele, os tamanhos seriam os mesmos. O caso com menos folga é o dos Professores, em que a /26 tem 62 endereços utilizáveis para 61 ocupados. Se a VLAN 10 tivesse 62 pontos, a /26 já não serviria, porque o gateway ficaria sem endereço.
+
+\subsecao{1.2 Bloco privado}
+
+Somando os blocos: 512 + 256 + 64 = 832 endereços. Como 2\textsuperscript{9} = 512 é menor que 832 e 2\textsuperscript{10} = 1024 é suficiente, o bloco precisa de 10 bits de host, com prefixo 32 − 10 = /22.
+
+As três faixas da RFC 1918 comportam um /22. Escolhi a 192.168.0.0/16, que é a menor das três e ainda tem espaço de sobra. Aqui aparece a diferença para o endereçamento por classes: 192.168.x.x é classe C, e uma rede classe C tem só 254 hosts (TANENBAUM; WETHERALL, 2011, seção 5.6.2), então os 500 pontos da Visita não caberiam em uma rede classe C. No endereçamento por classes, a alternativa seria ocupar uma rede classe B privada inteira (172.16.0.0/16, com 65.534 hosts) para menos de 800 endereços. Com CIDR, que permite prefixos fora das classes (FULLER; LI, 2006), o bloco 192.168.0.0/22 agrega quatro redes /24 consecutivas (de 192.168.0.x a 192.168.3.x) e atende à demanda.
+
+Conversão dos dois primeiros octetos: 192 = 128 + 64 = 11000000 e 168 = 128 + 32 + 8 = 10101000.
+
+\input{tab_bloco}
+
+Para converter os octetos de máscara usei a tabela Calunga, da aula extra de endereçamento IP (SAUER, [s. d.]a). A primeira linha traz o peso de cada bit; a segunda traz a soma acumulada da esquerda para a direita, que é o valor do octeto da máscara quando os primeiros bits estão em 1.
+
+\begin{table}[H]
+\caption{Calunga: valor do octeto da máscara pela quantidade de bits em 1}\label{tab:calunga}
+\small\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{@{}l*{8}{>{\centering\arraybackslash}X}@{}}
+\toprule
+\textbf{Bits em 1 no octeto} & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8\\
+\midrule
+Peso do bit & 128 & 64 & 32 & 16 & 8 & 4 & 2 & 1\\
+Valor acumulado & 128 & \textbf{\hb{192}} & 224 & 240 & 248 & \textbf{\hb{252}} & \textbf{\hb{254}} & 255\\
+\bottomrule
+\end{tabularx}
+\fonteadapt
+\end{table}
+
+Os três valores destacados são os que aparecem neste laboratório: 252 no 3º octeto do bloco /22 (6 bits), 254 no 3º octeto da /23 da Visita (7 bits) e 192 no 4º octeto da /26 dos Professores (2 bits). No bloco, o 3º octeto da máscara é 11111100 = 128 + 64 + 32 + 16 + 8 + 4 = 252, logo a máscara do bloco é 255.255.252.0. No último endereço os 10 bits de host valem 1 e o 3º octeto fica 00000011 = 3, então o bloco vai de 192.168.0.0 até 192.168.3.255.
+
+As subredes foram alocadas da maior para a menor, a partir do início do bloco, cada uma começando no endereço seguinte ao broadcast da anterior. Nessa ordem o início de cada subrede é sempre múltiplo do tamanho dela, e não sobram lacunas entre as subredes. O gateway de cada VLAN é o primeiro endereço utilizável.
+
+A Figura~\ref{fig:arvore} mostra a mesma divisão em forma de árvore. Cada nível acrescenta 1 bit à máscara e divide o bloco ao meio: o bit 0 fica com a primeira metade e o bit 1 com a segunda. A Visita fica com a primeira metade do /22. A segunda metade é dividida de novo para os Alunos, e o restante é dividido mais duas vezes até chegar ao /26 dos Professores. As metades que não foram usadas ficam reservadas para crescimento.
+
+\begin{figure}[tbp]
+\captionsetup{position=top}
+\caption{divisão do bloco 192.168.0.0/22 com VLSM}\label{fig:arvore}
+\centering
+\resizebox{\textwidth}{!}{\input{fig_arvore}}
+\fonte
+\end{figure}
+
+\subsecao{1.3 Visita (VLAN 30): 192.168.0.0/23}
+
+Por ser a maior subrede, começa no início do bloco. Com /23 são 9 bits de host: o último bit do 3º octeto e os 8 bits do 4º octeto.
+
+\input{tab_visita}
+
+Máscara: 11111110 = 254 (7 bits em 1 na tabela Calunga), ou seja, 255.255.254.0. O último bit do 3º octeto vale 0 no endereço da subrede e 1 no broadcast, que fica com o 3º octeto 00000001 = 1 e o 4º octeto 11111111 = 255, ou seja, 192.168.1.255. Os hosts vão de 192.168.0.1 a 192.168.1.254: 510 endereços utilizáveis para 501 ocupados (500 pontos e o gateway), sobram 9.
+
+Essa é a subrede que exige mais atenção, porque abrange dois valores do 3º octeto: 192.168.1.10 parece pertencer a outra rede, mas está na mesma subrede de 192.168.0.10. Por isso atribuí intencionalmente o endereço 192.168.1.10 ao PC6. A conferência com AND mostra que ele pertence à rede 192.168.0.0:
+
+\input{tab_and_visita}
+
+Início da próxima subrede (broadcast + 1):
+
+\input{tab_mais1_visita}
+
+Ao somar 1, os nove bits 1 do final passam a 0 e o vai um chega ao 3º octeto, que passa de 00000001 para 00000010 = 2. A subrede dos Alunos começa em 192.168.2.0.
+
+\subsecao{1.4 Alunos (VLAN 20): 192.168.2.0/24}
+
+Com /24, os três primeiros octetos são de rede e o 4º octeto é todo de host.
+
+\input{tab_alunos}
+
+O 3º octeto é 00000010 = 2 em todos os endereços desta subrede. São 254 endereços utilizáveis, de 192.168.2.1 a 192.168.2.254, para 201 ocupados, sobram 53.
+
+Conferência com AND (PC5, 192.168.2.11):
+
+\input{tab_and_alunos}
+
+Início da próxima subrede (broadcast + 1):
+
+\input{tab_mais1_alunos}
+
+O 3º octeto passa de 00000010 para 00000011 = 3, então a subrede dos Professores começa em 192.168.3.0.
+
+\subsecao{1.5 Professor (VLAN 10): 192.168.3.0/26}
+
+Com /26, o 4º octeto tem 2 bits de rede e 6 bits de host.
+
+\input{tab_prof}
+
+Máscara: 11000000 = 128 + 64 = 192, valor da tabela Calunga para dois bits em 1, ou seja, 255.255.255.192. No broadcast o 4º octeto fica 00111111 = 32 + 16 + 8 + 4 + 2 + 1 = 63. Os hosts vão de 192.168.3.1 a 192.168.3.62: 62 utilizáveis para 61 ocupados, sobra 1.
+
+Conferência com AND (PC4, 192.168.3.11):
+
+\input{tab_and_prof}
+
+Endereço seguinte ao broadcast:
+
+\input{tab_mais1_prof}
+
+O 4º octeto passa de 00111111 para 01000000 = 64. A partir de 192.168.3.64 não há mais subredes alocadas no bloco.
+
+\subsecao{1.6 Resposta final do endereçamento}
+
+\begin{table}[H]
+\caption{subredes de cada VLAN (resposta final)}\label{tab:final}
+\small\renewcommand{\arraystretch}{1.25}\setlength{\tabcolsep}{4.5pt}
+\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}Xcccccc@{}}
+\toprule
+\textbf{VLAN} & \textbf{Setor} & \textbf{Prefixo} & \textbf{Máscara} & \textbf{Subrede} & \textbf{Broadcast} & \textbf{Gateway} & \textbf{Sobra}\\
+\midrule
+30 & Visita & /23 & 255.255.254.0 & 192.168.0.0 & 192.168.1.255 & 192.168.0.1 & 9\\
+20 & Alunos & /24 & 255.255.255.0 & 192.168.2.0 & 192.168.2.255 & 192.168.2.1 & 53\\
+10 & Professor & /26 & 255.255.255.192 & 192.168.3.0 & 192.168.3.63 & 192.168.3.1 & 1\\
+\midrule
+\multicolumn{7}{@{}l}{\textbf{Total}} & \textbf{63}\\
+\bottomrule
+\end{tabularx}
+\fonte
+\end{table}
+
+Conferi o alinhamento pelo salto, que é 256 menos o valor do octeto da máscara em que fica a divisão entre rede e host. Na Visita a divisão está no 3º octeto e o salto é 256 − 254 = 2; o 3º octeto da subrede vale 0, que é múltiplo de 2. Nos Alunos o salto é 256 − 255 = 1 e o valor é 2. Nos Professores a divisão está no 4º octeto, o salto é 256 − 192 = 64 e o valor é 0. As três subredes estão alinhadas.
+
+A coluna Sobra da Tabela~\ref{tab:final} mostra os endereços utilizáveis que ficaram sem uso depois de descontar os pontos e o gateway. As três subredes ocupam 832 dos 1024 endereços do bloco, e os 192 restantes ficam reservados para crescimento:
+
+\begin{table}[H]
+\caption{mapa do bloco 192.168.0.0/22}\label{tab:mapa}
+\small\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}Xllr@{}}
+\toprule
+\textbf{Faixa} & \textbf{Bloco CIDR} & \textbf{Uso} & \textbf{Endereços}\\
+\midrule
+192.168.0.0 a 192.168.1.255 & 192.168.0.0/23 & Visita (VLAN 30) & 512\\
+192.168.2.0 a 192.168.2.255 & 192.168.2.0/24 & Alunos (VLAN 20) & 256\\
+192.168.3.0 a 192.168.3.63 & 192.168.3.0/26 & Professor (VLAN 10) & 64\\
+192.168.3.64 a 192.168.3.127 & 192.168.3.64/26 & Livre & 64\\
+192.168.3.128 a 192.168.3.255 & 192.168.3.128/25 & Livre & 128\\
+\midrule
+\textbf{Total} & \textbf{192.168.0.0/22} & & \textbf{1024}\\
+\bottomrule
+\end{tabularx}
+\fonte
+\end{table}
+
+A Figura~\ref{fig:regua} mostra o mesmo mapa em escala, com o tamanho de cada parte proporcional ao número de endereços.
+
+\begin{figure}[H]
+\captionsetup{position=top}
+\caption{mapa do bloco 192.168.0.0/22 em escala}\label{fig:regua}
+\centering
+\resizebox{\textwidth}{!}{\input{fig_regua}}
+\fonte
+\end{figure}
+
+\subsecao{1.7 VLSM comparado com máscara fixa}
+
+Para medir o aproveitamento, comparei os endereços ocupados (pontos + gateway) com os utilizáveis de cada subrede:
+
+\begin{table}[H]
+\caption{aproveitamento de cada subrede com VLSM}\label{tab:aproveitamento}
+\small\renewcommand{\arraystretch}{1.22}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}Xcrrrrr@{}}
+\toprule
+\textbf{VLAN} & \textbf{Prefixo} & \textbf{Bloco} & \textbf{Utilizáveis} & \textbf{Ocupados} & \textbf{Sobra} & \textbf{Aproveitamento}\\
+\midrule
+30 Visita & /23 & 512 & 510 & 501 & 9 & 98,2\%\\
+20 Alunos & /24 & 256 & 254 & 201 & 53 & 79,1\%\\
+10 Professor & /26 & 64 & 62 & 61 & 1 & 98,4\%\\
+\midrule
+\textbf{Total} & & \textbf{832} & \textbf{826} & \textbf{763} & \textbf{63} & \textbf{92,4\%}\\
+\bottomrule
+\end{tabularx}
+\fonte
+\end{table}
+
+Os Alunos têm a maior sobra porque 201 está bem abaixo de 254, mas a máscara seguinte (/25, com 126 utilizáveis) não comporta a VLAN. Cada subrede já está no menor tamanho possível, e a sobra que resta vem do fato de os blocos só poderem ter tamanhos que são potências de 2.
+
+Se as três VLANs usassem a máscara da maior (/23), seriam 3 × 512 = 1536 endereços, e o bloco teria que ser um /21. O aproveitamento cairia para 763 em 1530 utilizáveis (49,9\%): os Alunos usariam 201 de 510 (39,4\%) e os Professores só 61 de 510 (12,0\%). A Figura~\ref{fig:barras} compara os dois casos.
+
+\begin{figure}[H]
+\captionsetup{position=top}
+\caption{aproveitamento dos endereços: VLSM contra máscara fixa}\label{fig:barras}
+\centering
+\input{fig_barras}
+\fonte
+\end{figure}
+
+\subsecao{1.8 Conferência dos conceitos de endereçamento}
+
+A Tabela~\ref{tab:conceitos} responde, para os endereços deste laboratório, as perguntas básicas de endereçamento IP: classe, tipo de endereço, endereços reservados de cada subrede, se dois endereços estão na mesma rede e quantos hosts cabem em cada subrede.
+
+\begin{table}[H]
+\caption{conceitos de endereçamento aplicados ao laboratório}\label{tab:conceitos}
+\small\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{3.3cm}>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Pergunta} & \textbf{Resposta para este lab}\\
+\midrule
+Classe dos endereços & Classe C: o 1º octeto é 192 = 11000000, que começa com 110 (faixa de 192 a 223). A máscara padrão da classe C é /24; a /23 da Visita e o bloco /22 só são possíveis com CIDR.\\
+Público ou privado & Privado, dentro de 192.168.0.0/16 (RFC 1918). Não usei nenhum endereço especial, como 127.x.x.x (loopback) ou 169.254.x.x (autoconfiguração).\\
+Rede e broadcast de cada VLAN & Visita: 192.168.0.0 e 192.168.1.255. Alunos: 192.168.2.0 e 192.168.2.255. Professor: 192.168.3.0 e 192.168.3.63.\\
+Dois endereços na mesma rede & Estão na mesma rede quando o AND com a máscara resulta no mesmo endereço de rede. PC3 (192.168.0.10) e PC6 (192.168.1.10) resultam em 192.168.0.0 com /23: mesma rede. Com a máscara do PC1 (/26), 192.168.3.10 resulta em 192.168.3.0 e 192.168.2.11 em 192.168.2.0: redes diferentes.\\
+Hosts em cada subrede & 2\textsuperscript{\textit{h}} − 2: Visita 2\textsuperscript{9} − 2 = 510, Alunos 2\textsuperscript{8} − 2 = 254, Professor 2\textsuperscript{6} − 2 = 62.\\
+\bottomrule
+\end{tabularx}
+\fontebase{Tanenbaum e Wetherall (2011) e Rekhter et al. (1996)}
+\end{table}
+
+% ================================================================ TOPOLOGIA
+\secao{2 TOPOLOGIA E PLANO DE PORTAS}
+
+\subsecao{2.1 Topologia montada}
+
+A Figura~\ref{fig:topo} mostra a topologia com o endereçamento definido. Ela segue o desenho do roteiro: o SW3 fica no centro, ligado ao roteador e aos outros dois switches, e cada um dos switches de borda atende um PC de cada VLAN.
+
+\begin{figure}[tbp]
+\captionsetup{position=top}
+\caption{topologia do laboratório com o endereçamento definido}\label{fig:topo}
+\centering
+\resizebox{\textwidth}{!}{\input{fig_topo}}
+\fonte
+\end{figure}
+
+Cada cor representa uma VLAN. Os enlaces de acesso, entre os switches de borda e os PCs, levam uma única VLAN e aparecem com uma linha só. Os troncos levam as três VLANs e aparecem com três linhas, uma de cada cor. Os cabos entre switches são cruzados (crossover), e os demais são diretos.
+
+Do ponto de vista do roteador, a rede fica como na parte (b) da Figura~\ref{fig:logica}: três redes separadas, cada uma ligada a uma subinterface, que é o gateway daquela VLAN. Fisicamente, porém, é um cabo só, como na parte (a). O que permite que as três redes passem pelo mesmo cabo sem se misturar é a tag 802.1Q.
+
+\begin{figure}[tbp]
+\captionsetup{position=top}
+\caption{router on a stick: visão física e visão lógica}\label{fig:logica}
+\centering
+\resizebox{\textwidth}{!}{\input{fig_logica}}
+\fonte
+\end{figure}
+
+\subsecao{2.2 Portas e modos}
+
+\begin{table}[H]
+\caption{portas usadas em cada equipamento}\label{tab:portas}
+\small\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{@{}llll>{\raggedright\arraybackslash}Xl@{}}
+\toprule
+\textbf{Equipamento} & \textbf{Porta} & \textbf{Modo} & \textbf{VLAN} & \textbf{Ligada a} & \textbf{Cabo}\\
+\midrule
+SW1 & Fa0/1 & tronco & 10, 20, 30 & SW3 Fa0/1 & cruzado\\
+SW1 & Fa0/11 & acesso & 10 & PC1 & direto\\
+SW1 & Fa0/18 & acesso & 20 & PC2 & direto\\
+SW1 & Fa0/6 & acesso & 30 & PC3 & direto\\
+\midrule
+SW2 & Fa0/3 & tronco & 10, 20, 30 & SW3 Fa0/3 & cruzado\\
+SW2 & Fa0/11 & acesso & 10 & PC4 & direto\\
+SW2 & Fa0/18 & acesso & 20 & PC5 & direto\\
+SW2 & Fa0/6 & acesso & 30 & PC6 & direto\\
+\midrule
+SW3 & Fa0/1 & tronco & 10, 20, 30 & SW1 Fa0/1 & cruzado\\
+SW3 & Fa0/3 & tronco & 10, 20, 30 & SW2 Fa0/3 & cruzado\\
+SW3 & Gig0/1 & tronco & 10, 20, 30 & Roteador G0/0/0 & direto\\
+\midrule
+Roteador & G0/0/0 & subinterfaces & .10, .20, .30 & SW3 Gig0/1 & direto\\
+\bottomrule
+\end{tabularx}
+\fonte
+\end{table}
+
+\subsecao{2.3 Endereços dos equipamentos}
+
+\begin{table}[H]
+\caption{endereços IP configurados}\label{tab:ips}
+\small\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{@{}llll>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Equipamento} & \textbf{Interface} & \textbf{Endereço IP} & \textbf{Máscara} & \textbf{Gateway}\\
+\midrule
+Roteador & G0/0/0.10 & 192.168.3.1 & 255.255.255.192 & \\
+Roteador & G0/0/0.20 & 192.168.2.1 & 255.255.255.0 & \\
+Roteador & G0/0/0.30 & 192.168.0.1 & 255.255.254.0 & \\
+\midrule
+PC1 & Fa0 & 192.168.3.10 & 255.255.255.192 & 192.168.3.1\\
+PC4 & Fa0 & 192.168.3.11 & 255.255.255.192 & 192.168.3.1\\
+PC2 & Fa0 & 192.168.2.10 & 255.255.255.0 & 192.168.2.1\\
+PC5 & Fa0 & 192.168.2.11 & 255.255.255.0 & 192.168.2.1\\
+PC3 & Fa0 & 192.168.0.10 & 255.255.254.0 & 192.168.0.1\\
+PC6 & Fa0 & 192.168.1.10 & 255.255.254.0 & 192.168.0.1\\
+\bottomrule
+\end{tabularx}
+\fonte
+\end{table}
+
+Os gateways ficaram no primeiro endereço utilizável de cada subrede. Os PCs ficaram a partir do .10, deixando os primeiros endereços livres para equipamentos de infraestrutura. A única exceção é o PC6, ao qual atribuí 192.168.1.10 para verificar, nos testes, que a /23 da Visita inclui endereços com o 3º octeto igual a 1.
+
+\subsecao{2.4 Comentários registrados no cenário}
+
+O roteiro deixa espaços com ``subrede ?'' e ``GW ?'' ao lado de cada PC. No arquivo .pkt, esses espaços foram preenchidos com notas que trazem os valores calculados. Também incluí uma nota com o bloco escolhido, uma ao lado do roteador com as subinterfaces e uma ao lado do SW3 com os troncos.
+
+\begin{table}[H]
+\caption{texto das notas ao lado dos PCs}\label{tab:notas}
+\small\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{PCs} & \textbf{Texto da nota}\\
+\midrule
+PC1 e PC4 & Professor, VLAN 10, subrede 192.168.3.0/26, 255.255.255.192, GW 192.168.3.1\\
+PC2 e PC5 & Aluno, VLAN 20, subrede 192.168.2.0/24, 255.255.255.0, GW 192.168.2.1\\
+PC3 e PC6 & Visita, VLAN 30, subrede 192.168.0.0/23, 255.255.254.0, GW 192.168.0.1\\
+\bottomrule
+\end{tabularx}
+\fonte
+\end{table}
+
+Cada nota termina com o IP do PC ao lado dela, por exemplo ``PC1: 192.168.3.10''.
+
+% ============================================================== CONFIGURACAO
+\secao{3 CONFIGURAÇÃO DOS EQUIPAMENTOS}
+
+\subsecao{3.1 Criação das VLANs}
+
+As três VLANs foram criadas com os mesmos números e nomes nos três switches, inclusive no SW3. O SW3 não tem nenhuma porta de acesso, mas precisa conhecer as VLANs mesmo assim: um switch só encaminha pelo tronco quadros de VLANs que existem na sua base de VLANs. Se a VLAN 20 não existisse no SW3, os quadros com tag 20 seriam descartados ali e os Alunos do SW1 não se comunicariam com os do SW2 nem com o roteador. A configuração do SW1 foi a seguinte; no SW2 e no SW3 os comandos são os mesmos, mudando apenas o nome no prompt:
+
+\begin{cmd}
+SW1# configure terminal
+SW1(config)# vlan 10
+SW1(config-vlan)# name professor
+SW1(config-vlan)# exit
+SW1(config)# vlan 20
+SW1(config-vlan)# name aluno
+SW1(config-vlan)# exit
+SW1(config)# vlan 30
+SW1(config-vlan)# name visita
+SW1(config-vlan)# exit
+\end{cmd}
+
+As VLANs não aparecem no \texttt{show running-config} do 2960, porque o switch está no modo VTP servidor (o padrão) e guarda a base de VLANs no arquivo \texttt{vlan.dat} da memória flash (CISCO SYSTEMS, [s. d.]d). Para conferir as VLANs, o comando adequado é o \texttt{show vlan brief}, que aparece na seção 4.
+
+\subsecao{3.2 Portas de acesso}
+
+As portas dos PCs foram colocadas em modo de acesso e associadas à VLAN de cada um. O SW2 recebeu exatamente os mesmos comandos, porque o roteiro usa as mesmas portas nos dois switches de borda. No SW3 não há PCs ligados, então nele não existe porta de acesso para configurar:
+
+\begin{cmd}
+SW1(config)# interface f0/11
+SW1(config-if)# switchport mode access
+SW1(config-if)# switchport access vlan 10
+SW1(config-if)# exit
+SW1(config)# interface f0/18
+SW1(config-if)# switchport mode access
+SW1(config-if)# switchport access vlan 20
+SW1(config-if)# exit
+SW1(config)# interface f0/6
+SW1(config-if)# switchport mode access
+SW1(config-if)# switchport access vlan 30
+SW1(config-if)# exit
+\end{cmd}
+
+\subsecao{3.3 Troncos}
+
+São cinco interfaces em modo tronco: a f0/1 do SW1, a f0/3 do SW2 e as três do SW3 (f0/1, f0/3 e g0/1). A VLAN nativa não foi alterada. No SW1:
+
+\begin{cmd}
+SW1(config)# interface f0/1
+SW1(config-if)# switchport mode trunk
+SW1(config-if)# switchport trunk allowed vlan 10,20,30
+SW1(config-if)# end
+\end{cmd}
+
+No SW2 os mesmos comandos foram aplicados na f0/3. No SW3 foram aplicados nas três interfaces:
+
+\begin{cmd}
+SW3(config)# interface f0/1
+SW3(config-if)# switchport mode trunk
+SW3(config-if)# switchport trunk allowed vlan 10,20,30
+SW3(config-if)# exit
+SW3(config)# interface f0/3
+SW3(config-if)# switchport mode trunk
+SW3(config-if)# switchport trunk allowed vlan 10,20,30
+SW3(config-if)# exit
+SW3(config)# interface g0/1
+SW3(config-if)# switchport mode trunk
+SW3(config-if)# switchport trunk allowed vlan 10,20,30
+SW3(config-if)# end
+\end{cmd}
+
+A g0/1 do SW3 está ligada ao roteador e também opera como tronco, porque é por ela que as três VLANs chegam às subinterfaces.
+
+\subsecao{3.4 Roteador}
+
+No roteador cada subinterface recebe primeiro o \texttt{encapsulation dot1Q} e só depois o IP. A ordem importa: o IOS recusa o \texttt{ip address} em uma subinterface de LAN que ainda não tem encapsulamento definido (CISCO SYSTEMS, [s. d.]b). Os endereços são os gateways da Tabela~\ref{tab:final}:
+
+\begin{cmd}
+Router# configure terminal
+Router(config)# interface g0/0/0.10
+Router(config-subif)# encapsulation dot1Q 10
+Router(config-subif)# ip address 192.168.3.1 255.255.255.192
+Router(config-subif)# exit
+Router(config)# interface g0/0/0.20
+Router(config-subif)# encapsulation dot1Q 20
+Router(config-subif)# ip address 192.168.2.1 255.255.255.0
+Router(config-subif)# exit
+Router(config)# interface g0/0/0.30
+Router(config-subif)# encapsulation dot1Q 30
+Router(config-subif)# ip address 192.168.0.1 255.255.254.0
+Router(config-subif)# exit
+Router(config)# interface g0/0/0
+Router(config-if)# no shutdown
+Router(config-if)# end
+\end{cmd}
+
+O \texttt{no shutdown} é aplicado à interface física. As interfaces do roteador vêm desligadas por padrão, e as subinterfaces só ficam ativas quando a G0/0/0 é ativada. O trecho das interfaces no \texttt{show running-config} ficou assim:
+
+\begin{cmd}
+interface GigabitEthernet0/0/0
+ no ip address
+ duplex auto
+ speed auto
+!
+interface GigabitEthernet0/0/0.10
+ encapsulation dot1Q 10
+ ip address 192.168.3.1 255.255.255.192
+!
+interface GigabitEthernet0/0/0.20
+ encapsulation dot1Q 20
+ ip address 192.168.2.1 255.255.255.0
+!
+interface GigabitEthernet0/0/0.30
+ encapsulation dot1Q 30
+ ip address 192.168.0.1 255.255.254.0
+\end{cmd}
+
+A G0/0/0 não recebe IP, porque os endereços ficam nas subinterfaces. As interfaces G0/0/1 e G0/0/2 não foram usadas e continuam desligadas.
+
+\subsecao{3.5 PCs}
+
+Os PCs foram configurados em Desktop, IP Configuration, com endereço estático, usando os valores da Tabela~\ref{tab:ips}. O ponto que exige mais atenção é a máscara: o PC deve usar a mesma máscara da subinterface do gateway. No PC6, por exemplo, se a máscara fosse 255.255.255.0 em vez de 255.255.254.0, ele calcularia a própria rede como 192.168.1.0 e concluiria que o gateway 192.168.0.1 está em outra rede.
+
+\subsecao{3.6 Gravação das configurações}
+
+Como o roteiro pede, as configurações foram salvas nos quatro equipamentos com IOS (SW1, SW2, SW3 e o roteador):
+
+\begin{cmd}
+SW1# copy running-config startup-config
+Destination filename [startup-config]?
+\end{cmd}
+
+A pergunta sobre o nome do arquivo é confirmada com Enter. No arquivo entregue, a startup-config de cada equipamento é igual à running-config, portanto o reinício do cenário não apaga nenhuma configuração.
+
+\subsecao{3.7 Resumo dos comandos}
+
+A Tabela~\ref{tab:comandos} reúne os comandos usados no laboratório, no mesmo formato das tabelas do roteiro. Na coluna Modo, EXEC priv. é o modo EXEC privilegiado, o do prompt terminado em \#. No 2960 não é preciso escolher o encapsulamento do tronco, porque esse switch só trabalha com 802.1Q (CISCO SYSTEMS, [s. d.]d).
+
+\begin{table}[H]
+\caption{comandos usados e o que cada um faz}\label{tab:comandos}
+\footnotesize\renewcommand{\arraystretch}{1.18}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{7.3cm}l>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Comando} & \textbf{Modo} & \textbf{O que faz}\\
+\midrule
+\texttt{vlan 10} & config & cria a VLAN 10 e entra nela\\
+\texttt{name professor} & config-vlan & define o nome da VLAN\\
+\texttt{switchport mode access} & config-if & fixa a porta em modo de acesso\\
+\texttt{switchport access vlan 10} & config-if & coloca a porta na VLAN 10\\
+\texttt{switchport mode trunk} & config-if & fixa a porta em modo tronco 802.1Q\\
+\texttt{switchport trunk allowed vlan 10,20,30} & config-if & limita o tronco às VLANs 10, 20 e 30\\
+\texttt{interface g0/0/0.10} & config & cria a subinterface .10 e entra nela\\
+\texttt{encapsulation dot1Q 10} & config-subif & associa a subinterface à VLAN 10\\
+\texttt{ip address 192.168.3.1 255.255.255.192} & config-subif & define o gateway da VLAN 10\\
+\texttt{no shutdown} & config-if & liga a interface física do roteador\\
+\texttt{copy running-config startup-config} & EXEC priv. & grava a configuração na NVRAM\\
+\texttt{show vlan brief} & EXEC priv. & lista as VLANs e as portas de acesso\\
+\texttt{show interfaces trunk} & EXEC priv. & lista troncos e VLANs permitidas\\
+\texttt{show ip interface brief} & EXEC priv. & mostra IP e estado das interfaces\\
+\bottomrule
+\end{tabularx}
+\fontebase{Sauer ([2023?]) e Cisco Systems ([s. d.]b, [s. d.]d)}
+\end{table}
+
+% ============================================================= VERIFICACAO
+\secao{4 VERIFICAÇÃO E TESTES}
+
+As telas do Packet Tracer com os testes desta seção estão no Apêndice B.
+
+\subsecao{4.1 VLANs nos switches}
+
+Com a configuração aplicada, o \texttt{show vlan brief} do SW1 mostra as três VLANs com suas portas de acesso, igual ao exemplo do roteiro. A Fa0/1 não aparece na lista porque é tronco:
+
+\begin{saida}
+SW1#show vlan brief
+
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    Fa0/2, Fa0/3, Fa0/4, Fa0/5
+                                                Fa0/7, Fa0/8, Fa0/9, Fa0/10
+                                                Fa0/12, Fa0/13, Fa0/14, Fa0/15
+                                                Fa0/16, Fa0/17, Fa0/19, Fa0/20
+                                                Fa0/21, Fa0/22, Fa0/23, Fa0/24
+                                                Gig0/1, Gig0/2
+10   professor                        active    Fa0/11
+20   aluno                            active    Fa0/18
+30   visita                           active    Fa0/6
+1002 fddi-default                     active
+1003 token-ring-default               active
+1004 fddinet-default                  active
+1005 trnet-default                    active
+\end{saida}
+
+No SW2 a saída é igual, com a diferença de que a porta ausente da VLAN 1 é a Fa0/3 (o tronco desse switch), e a Fa0/1 volta a ser listada. As outras duas opções da tabela do roteiro mostram uma única VLAN: \texttt{show vlan id 10} escolhe a VLAN pelo número e \texttt{show vlan name professor} pelo nome, o que ajuda a conferir uma VLAN de cada vez. No SW3 as três VLANs aparecem sem nenhuma porta, o que é o esperado para um switch que só tem troncos:
+
+\begin{saida}
+SW3#show vlan brief
+
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    Fa0/2, Fa0/4, Fa0/5, Fa0/6
+                                                Fa0/7, Fa0/8, Fa0/9, Fa0/10
+                                                Fa0/11, Fa0/12, Fa0/13, Fa0/14
+                                                Fa0/15, Fa0/16, Fa0/17, Fa0/18
+                                                Fa0/19, Fa0/20, Fa0/21, Fa0/22
+                                                Fa0/23, Fa0/24, Gig0/2
+10   professor                        active
+20   aluno                            active
+30   visita                           active
+1002 fddi-default                     active
+1003 token-ring-default               active
+1004 fddinet-default                  active
+1005 trnet-default                    active
+\end{saida}
+
+\subsecao{4.2 Troncos}
+
+O \texttt{show interfaces trunk} confere os troncos. No SW3 ele lista as três interfaces com o resumo abaixo, e no SW1 e no SW2 aparece só a interface de tronco de cada um:
+
+\begin{table}[H]
+\caption{troncos do SW3 segundo o show interfaces trunk}\label{tab:troncos}
+\small\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{@{}lllcl>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Porta} & \textbf{Modo} & \textbf{Encapsulamento} & \textbf{Nativa} & \makecell[l]{\textbf{VLANs}\\\textbf{permitidas}} & \textbf{VLANs ativas e encaminhando}\\
+\midrule
+Fa0/1 & on & 802.1q & 1 & 10,20,30 & 10,20,30\\
+Fa0/3 & on & 802.1q & 1 & 10,20,30 & 10,20,30\\
+Gig0/1 & on & 802.1q & 1 & 10,20,30 & 10,20,30\\
+\bottomrule
+\end{tabularx}
+\fonte
+\end{table}
+
+O modo ``on'' indica tronco fixo, configurado com \texttt{switchport mode trunk}. A VLAN nativa continua sendo a 1, como o roteiro pediu.
+
+\subsecao{4.3 Roteador}
+
+No \texttt{show ip interface brief} a G0/0/0 aparece \emph{up/up} sem endereço (\emph{unassigned}), as três subinterfaces aparecem \emph{up/up} com os IPs dos gateways e a G0/0/1 e a G0/0/2 aparecem \emph{administratively down}. A tabela de rotas fica só com as redes diretamente conectadas, uma por subinterface, e com as rotas locais (/32) dos próprios endereços do roteador:
+
+\begin{table}[H]
+\caption{tabela de rotas do roteador (show ip route)}\label{tab:rotas}
+\small\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{@{}cll>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Código} & \textbf{Destino} & \textbf{Interface} & \textbf{Significado}\\
+\midrule
+C & 192.168.0.0/23 & G0/0/0.30 & rede da Visita, diretamente conectada\\
+L & 192.168.0.1/32 & G0/0/0.30 & endereço do próprio roteador nessa rede\\
+C & 192.168.2.0/24 & G0/0/0.20 & rede dos Alunos, diretamente conectada\\
+L & 192.168.2.1/32 & G0/0/0.20 & endereço do próprio roteador nessa rede\\
+C & 192.168.3.0/26 & G0/0/0.10 & rede dos Professores, diretamente conectada\\
+L & 192.168.3.1/32 & G0/0/0.10 & endereço do próprio roteador nessa rede\\
+\bottomrule
+\end{tabularx}
+\fonte
+\end{table}
+
+Nenhuma rota estática ou protocolo de roteamento é necessário, porque as três redes estão ligadas ao mesmo roteador.
+
+\subsecao{4.4 Ping entre todos os PCs}
+
+A Tabela~\ref{tab:ping} mostra como cada ping é resolvido. ``L2'' indica que origem e destino estão na mesma VLAN e o pacote segue diretamente pelos switches, sem passar pelo roteador. ``R'' indica que estão em VLANs diferentes e o pacote passa pelo roteador. Os 30 pares têm conectividade.
+
+\begin{table}[H]
+\caption{matriz de ping (linha: origem; coluna: destino)}\label{tab:ping}
+\small\renewcommand{\arraystretch}{1.2}
+\centering
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+ & \textbf{PC1} & \textbf{PC2} & \textbf{PC3} & \textbf{PC4} & \textbf{PC5} & \textbf{PC6}\\
+ & \scriptsize VLAN 10 & \scriptsize VLAN 20 & \scriptsize VLAN 30 & \scriptsize VLAN 10 & \scriptsize VLAN 20 & \scriptsize VLAN 30\\
+\midrule
+\textbf{PC1} & & R & R & L2 & R & R\\
+\textbf{PC2} & R & & R & R & L2 & R\\
+\textbf{PC3} & R & R & & R & R & L2\\
+\textbf{PC4} & L2 & R & R & & R & R\\
+\textbf{PC5} & R & L2 & R & R & & R\\
+\textbf{PC6} & R & R & L2 & R & R & \\
+\bottomrule
+\end{tabular}
+\fonte
+\end{table}
+
+O TTL das respostas mostra a diferença entre os dois casos. Cada roteador que encaminha um pacote diminui o TTL em 1 (POSTEL, 1981b; TANENBAUM; WETHERALL, 2011, seção 5.6.1). No Packet Tracer os PCs enviam com TTL inicial 128 e o roteador responde com TTL inicial 255. No ping do PC1 para o PC4 a resposta chega com TTL=128, porque nenhum roteador foi atravessado. No ping do PC1 para o PC5 a resposta chega com TTL=127, porque passou uma vez pelo roteador. No ping de um PC para o próprio gateway quem responde é o roteador, e a resposta chega com TTL=255.
+
+Depois de reiniciar o cenário, é normal que o primeiro pacote do ping entre VLANs diferentes fique sem resposta (\emph{Request timed out}). Nesse momento o roteador ainda não tem o MAC do destino na tabela ARP, e o IOS descarta o pacote que provocou a consulta ARP (CISCO SYSTEMS, [s. d.]e). Os pacotes seguintes passam.
+
+\subsecao{4.5 Tracert}
+
+O tracert mostra por onde o pacote passa. Ele envia pacotes com TTL 1, 2, 3 e assim por diante; o roteador que recebe um pacote com o TTL esgotado devolve uma mensagem ICMP de tempo excedido, e assim o PC descobre cada salto até o destino (POSTEL, 1981a; TANENBAUM; WETHERALL, 2011, seção 5.6.4). Escolhi um caso de cada tipo, que aparecem na Tabela~\ref{tab:tracert}.
+
+\begin{table}[H]
+\caption{saltos mostrados pelo tracert}\label{tab:tracert}
+\footnotesize\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{@{}lll>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Origem} & \textbf{Comando} & \textbf{Saltos} & \textbf{O que mostra}\\
+\midrule
+PC1 & tracert 192.168.2.11 & 1: 192.168.3.1; 2: 192.168.2.11 & passa pelo gateway da VLAN 10 e chega ao PC5\\
+PC6 & tracert 192.168.2.10 & 1: 192.168.0.1; 2: 192.168.2.10 & passa pelo gateway da VLAN 30 e chega ao PC2\\
+PC3 & tracert 192.168.1.10 & 1: 192.168.1.10 & mesma VLAN: chega diretamente ao PC6, sem roteador\\
+\bottomrule
+\end{tabularx}
+\fonte
+\end{table}
+
+Quando o destino está em outra VLAN, o primeiro salto é sempre o gateway da VLAN de origem, como o roteiro descreve: o caminho vai do PC de origem para o seu gateway e depois para o PC de destino. No terceiro teste o PC3 faz o AND de 192.168.1.10 com a sua máscara /23, obtém 192.168.0.0, que é a sua própria rede, e entrega o pacote diretamente, depois de obter o MAC do PC6 por ARP, embora o 3º octeto seja diferente.
+
+\subsecao{4.6 Modo simulação: ping do PC1 para o PC5}
+
+Para o teste no modo simulação o cenário foi reiniciado (botão de power cycle), o que esvazia as tabelas CAM dos switches e as tabelas ARP. Com o filtro em ARP e ICMP, fiz um ping do PC1 (VLAN 10) para o PC5 (VLAN 20). A Figura~\ref{fig:sequencia} mostra a troca completa de mensagens, numeradas na ordem em que aparecem na lista de eventos.
+
+\begin{figure}[tbp]
+\captionsetup{position=top}
+\caption{troca de mensagens no ping do PC1 para o PC5}\label{fig:sequencia}
+\centering
+\resizebox{\textwidth}{!}{\input{fig_sequencia}}
+\fonte
+\end{figure}
+
+\textbf{Decisão do PC1.} Antes de enviar qualquer quadro, o PC1 faz o AND do destino com a sua máscara:
+
+\input{tab_and_pc1_pc5}
+
+O resultado, 192.168.2.0, é diferente da rede do PC1 (192.168.3.0). Logo o PC5 está em outra rede e o pacote vai para o gateway 192.168.3.1. Com o PC4 (192.168.3.11) o mesmo AND daria 192.168.3.0, a própria rede, e o PC1 entregaria o pacote diretamente.
+
+\textbf{Mensagem 1: ARP do PC1.} O PC1 não conhece o MAC do gateway e envia um ARP em broadcast. O SW1 recebe o quadro na Fa0/11, que é da VLAN 10, e o encaminha apenas para portas da VLAN 10. A única é o tronco Fa0/1, por onde o quadro sai com tag 10. O SW3 encaminha o quadro para a Fa0/3 e para a Gig0/1, também com tag 10. O SW2 entrega ao PC4 sem tag, e o roteador recebe na G0/0/0.10. O PC4 descarta a pergunta, porque o IP procurado não é o dele. A Figura~\ref{fig:alcance} e a Tabela~\ref{tab:arp} mostram o alcance desse broadcast.
+
+\begin{figure}[tbp]
+\captionsetup{position=top}
+\caption{alcance do broadcast ARP do PC1, sem e com VLANs}\label{fig:alcance}
+\centering
+\resizebox{\textwidth}{!}{\input{fig_alcance}}
+\fonte
+\end{figure}
+
+\begin{table}[H]
+\caption{alcance dos broadcasts ARP}\label{tab:arp}
+\small\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{@{}lll>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Quem pergunta} & \textbf{IP procurado} & \textbf{Recebem o broadcast} & \textbf{Não recebem}\\
+\midrule
+PC1 (VLAN 10) & 192.168.3.1 & PC4 e G0/0/0.10 & PC2, PC3, PC5 e PC6\\
+Roteador (G0/0/0.20) & 192.168.2.11 & PC2 e PC5 & PC1, PC3, PC4 e PC6\\
+\bottomrule
+\end{tabularx}
+\fonte
+\end{table}
+
+Sem VLANs, esse broadcast chegaria aos outros cinco PCs e ao roteador. Com VLANs, chegou a dois equipamentos. É essa a redução do broadcast ARP que o roteiro pede para observar.
+
+\textbf{Mensagem 2: resposta do roteador.} O roteador responde em unicast com o MAC da G0/0/0 (0006.2A62.1301). As subinterfaces usam o MAC da interface física. Como o quadro de ida passou pelos switches, eles já aprenderam o MAC do PC1 na VLAN 10, e a resposta segue apenas pelas portas corretas. O roteador também guardou o MAC do PC1, porque a pergunta era dirigida a ele.
+
+\textbf{Mensagem 3: primeiro echo request.} O PC1 envia o \emph{echo request} para o MAC do roteador, com tag 10 nos troncos.
+
+\textbf{Mensagem 4: ARP do roteador.} O roteador consulta a tabela de rotas, vê que 192.168.2.0/24 está na G0/0/0.20 e faz um ARP por 192.168.2.11 na VLAN 20. Esse broadcast sai com tag 20 e só chega ao PC5 e ao PC2, que descarta. Enquanto isso, o IOS descarta o \emph{echo request} que provocou a consulta, e por isso o primeiro ping termina em timeout no PC1, como explicado na seção 4.4.
+
+\textbf{Mensagem 5: resposta do PC5.} O PC5 responde com o seu MAC (0006.2A48.1D01) e guarda o MAC do roteador, pelo mesmo motivo da mensagem 2.
+
+\textbf{Mensagens 6 a 9: o ping bem-sucedido.} No segundo ping o roteador já conhece os dois MACs. Ele recebe o \emph{echo request} com tag 10, troca o cabeçalho Ethernet, diminui o TTL em 1 e encaminha o pacote pela G0/0/0.20 com tag 20. O PC5 responde para o seu gateway 192.168.2.1, e o roteador devolve a resposta para a VLAN 10. Na volta não há nenhum ARP, porque os dois lados guardaram os MACs nas mensagens 2 e 5.
+
+A Tabela~\ref{tab:echo} resume o \emph{echo request} em cada trecho, com os MACs reais do arquivo .pkt. O IP de origem (192.168.3.10) e o de destino (192.168.2.11) não mudam em nenhum trecho; o que muda é o cabeçalho Ethernet e a tag.
+
+\begin{table}[H]
+\caption{echo request do PC1 para o PC5, trecho por trecho}\label{tab:echo}
+\small\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}Xlll@{}}
+\toprule
+\textbf{Trecho} & \textbf{Tag 802.1Q} & \textbf{MAC de origem} & \textbf{MAC de destino}\\
+\midrule
+PC1 para SW1 (Fa0/11) & sem tag & 0060.2FCB.D201 (PC1) & 0006.2A62.1301 (roteador)\\
+SW1 (Fa0/1) para SW3 (Fa0/1) & VLAN 10 & 0060.2FCB.D201 (PC1) & 0006.2A62.1301 (roteador)\\
+SW3 (Gig0/1) para roteador & VLAN 10 & 0060.2FCB.D201 (PC1) & 0006.2A62.1301 (roteador)\\
+roteador para SW3 (Gig0/1) & VLAN 20 & 0006.2A62.1301 (roteador) & 0006.2A48.1D01 (PC5)\\
+SW3 (Fa0/3) para SW2 (Fa0/3) & VLAN 20 & 0006.2A62.1301 (roteador) & 0006.2A48.1D01 (PC5)\\
+SW2 (Fa0/18) para PC5 & sem tag & 0006.2A62.1301 (roteador) & 0006.2A48.1D01 (PC5)\\
+\bottomrule
+\end{tabularx}
+\fonte
+\end{table}
+
+O cabo entre o SW3 e o roteador aparece duas vezes na tabela, uma com tag 10 e outra com tag 20. É o mesmo pacote indo e voltando pelo mesmo enlace, o que dá nome à técnica \emph{router on a stick}.
+
+Depois desse ping, a tabela CAM do SW1 passa a ter, entre outras entradas, o MAC do PC1 na Fa0/11 (VLAN 10) e o MAC do roteador na Fa0/1 em duas VLANs: na 10, pela resposta ARP e pelo \emph{echo reply}, e na 20, pelo broadcast ARP do roteador que passou pelo SW1 a caminho do PC2. O comando \texttt{show mac-address-table} mostra essas entradas com a coluna de VLAN.
+
+O roteiro avisa que o Packet Tracer pode interromper a simulação por causa do buffer. Nesse caso o tracert, que aparece na seção 4.5, já mostra o funcionamento das VLANs e a passagem pelo gateway.
+
+% ============================================================== CUIDADOS
+\secao{5 CUIDADOS NA MONTAGEM}
+
+Alguns erros impedem o funcionamento do laboratório sem gerar mensagens claras. A Tabela~\ref{tab:diagnostico} resume os casos que descrevo a seguir: o sintoma que aparece, a causa mais provável e o comando que confirma.
+
+\begin{table}[tbp]
+\caption{diagnóstico de falhas do laboratório}\label{tab:diagnostico}
+\footnotesize\renewcommand{\arraystretch}{1.18}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3.9cm}@{}}
+\toprule
+\textbf{Sintoma} & \textbf{Causa provável} & \textbf{Como confirmar}\\
+\midrule
+PC não alcança o PC da mesma VLAN no outro switch nem o gateway & VLAN não criada no SW3 ou fora da lista do tronco & \texttt{show vlan brief} e \texttt{show interfaces trunk} no SW3\\
+Ping dentro da mesma VLAN funciona, mas nenhum ping entre VLANs & G0/0/0 desligada & \texttt{show ip interface brief} no roteador\\
+Uma VLAN inteira não alcança o gateway & número errado no \texttt{encapsulation dot1Q} ou IP errado na subinterface & \texttt{show running-config} no roteador\\
+Só um PC não sai da própria VLAN & gateway ou máscara errados no PC & \texttt{ipconfig} no PC\\
+Nada responde logo depois de ligar & portas ainda nos estados do STP (LED laranja) & esperar ou usar o Fast Forward Time\\
+Primeiro ping entre VLANs termina em timeout & ARP do roteador em andamento & é normal: os pings seguintes passam\\
+\bottomrule
+\end{tabularx}
+\fontebase{Cisco Systems ([s. d.]c, [s. d.]d, [s. d.]e)}
+\end{table}
+
+Estes foram os pontos que conferi:
+
+\textbf{VLANs no SW3.} Se as VLANs não forem criadas no SW3, os troncos dele não encaminham as VLANs 10, 20 e 30. No \texttt{show interfaces trunk} elas deixam de aparecer na linha de VLANs ativas, e cada PC fica isolado: não alcança o PC da mesma VLAN no outro switch nem o gateway, porque os dois caminhos passam pelo SW3.
+
+\textbf{G0/0/0 desligada.} As interfaces do roteador vêm em \emph{shutdown} por padrão. Sem o \texttt{no shutdown} na interface física, as três subinterfaces ficam \emph{down} e nenhum ping entre VLANs funciona.
+
+\textbf{Número errado no encapsulamento.} O número do \texttt{encapsulation dot1Q} deve ser o da VLAN. Se a G0/0/0.20 tivesse \texttt{encapsulation dot1Q 30}, ela receberia os quadros da VLAN 30 com o IP da VLAN 20, e as duas VLANs ficariam sem gateway funcionando.
+
+\textbf{Gateway no endereço errado.} O gateway deve ser um endereço utilizável da subrede do PC e deve coincidir com o IP configurado na subinterface. Usar o broadcast como gateway é um erro frequente: é o caso da questão 28 da prova da Petrobras de 2011 (CESGRANRIO) resolvida na aula extra de endereçamento IP (SAUER, [s. d.]a), em que a estação 192.168.0.15/26 tem gateway 192.168.0.63, que é o broadcast da subrede.
+
+\textbf{Máscara do PC diferente da do gateway.} No PC6 esse erro é provável, porque o endereço 192.168.1.10 sugere, à primeira vista, uma máscara /24. Com /24 o PC6 calcula a rede 192.168.1.0 e o gateway 192.168.0.1 fica fora dela.
+
+\textbf{Espera do spanning tree.} Depois de ligar ou reiniciar os switches, as portas ficam 15 segundos em escuta e 15 em aprendizado do STP antes de encaminhar (CISCO SYSTEMS, [s. d.]c). Enquanto o LED está laranja, o ping falha; no Packet Tracer é possível adiantar o tempo com o Fast Forward Time.
+
+\textbf{Nomes das interfaces.} O roteiro avisa que algumas interfaces podem estar diferentes. Neste cenário o roteador é um ISR 4331, cuja interface tem três números (G0/0/0), e o SW3 se liga a ele pela Gig0/1. Conferi cada interface antes de configurar.
+
+% ======================================================= CONSIDERACOES
+\secao{CONSIDERAÇÕES FINAIS}
+
+O endereçamento usou o bloco privado 192.168.0.0/22, dividido com VLSM em 192.168.0.0/23 para a Visita, 192.168.2.0/24 para os Alunos e 192.168.3.0/26 para os Professores, com gateway no primeiro endereço de cada subrede. O aproveitamento dos endereços utilizáveis ficou em 92,4\%, contra 49,9\% se todas as VLANs usassem a máscara da maior, e sobraram dois blocos livres (192.168.3.64/26 e 192.168.3.128/25) para crescimento.
+
+Na parte prática, as VLANs isolaram os broadcasts de cada grupo, os troncos 802.1Q levaram as três VLANs até o roteador e as subinterfaces da G0/0/0 fizeram o roteamento entre elas. Os pontos que exigiram mais atenção foram a criação das VLANs também no SW3, que não tem portas de acesso, e a /23 da Visita, que abrange dois valores do 3º octeto e por isso foi testada intencionalmente com o PC6 em 192.168.1.10.
+
+A Tabela~\ref{tab:roteiro} relaciona cada item pedido no roteiro à parte deste relatório em que ele aparece.
+
+\begin{table}[H]
+\caption{itens do roteiro e onde foram atendidos}\label{tab:roteiro}
+\footnotesize\renewcommand{\arraystretch}{1.12}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}Xl@{}}
+\toprule
+\textbf{Item pedido no roteiro} & \textbf{Seção}\\
+\midrule
+Melhor distribuição de endereços privados, com máscara e gateway de cada VLAN & 1\\
+Subrede e gateway registrados como comentário no cenário & 2.4 e .pkt\\
+VLANs 10, 20 e 30 criadas e nomeadas nos três switches & 3.1 e 4.1\\
+Portas de acesso associadas às VLANs & 3.2 e 4.1\\
+Troncos nas 5 interfaces, só com as VLANs 10, 20 e 30 e sem mudar a nativa & 3.3 e 4.2\\
+Router on a stick com subinterfaces .10, .20 e .30 e \texttt{no shutdown} & 3.4 e 4.3\\
+PCs com IP, máscara e gateway & 2.3 e 3.5\\
+\texttt{copy running-config startup-config} em todos os equipamentos & 3.6\\
+Reinício do cenário e ping no modo simulação, com redução do broadcast ARP & 4.6 e B.5\\
+Tracert entre VLANs passando pelo gateway & 4.5\\
+\bottomrule
+\end{tabularx}
+\fonte
+\end{table}
+
+% ========================================================== REFERENCIAS
+\secao{REFERÊNCIAS}
+
+\begingroup
+\setstretch{1.0}
+\setlength{\parskip}{3pt}
+\raggedright
+CISCO SYSTEMS. Administering the switch. \emph{In}: CISCO SYSTEMS. \textbf{Catalyst 2960 and 2960-S Switches Software Configuration Guide, Cisco IOS Release 15.2(1)E}. San Jose: Cisco, [\emph{s. d.}]a. Disponível em: \url{https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst2960/software/release/15-2_1_e/configuration/guide/2960_scg/swadmin.html}. Acesso em: 1 out. 2026.
+
+CISCO SYSTEMS. \textbf{Cisco Packet Tracer}. Versão 8.2.2.0400. San Jose: Cisco Networking Academy, 2024. Software.
+
+CISCO SYSTEMS. Configuring routing between VLANs with IEEE 802.1Q encapsulation. \emph{In}: CISCO SYSTEMS. \textbf{LAN Switching Configuration Guide, Cisco IOS XE 16}. San Jose: Cisco, [\emph{s. d.}]b. Disponível em: \url{https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lanswitch/configuration/xe-16/lanswitch-xe-16-book/lnsw-conf-vlan-ieee.html}. Acesso em: 1 out. 2026.
+
+CISCO SYSTEMS. Configuring STP. \emph{In}: CISCO SYSTEMS. \textbf{Catalyst 2960, 2960-S, 2960-C, and 2960{-}Plus Switches Software Configuration Guide, Cisco IOS Release 15.0(2)SE and Later}. San Jose: Cisco, [\emph{s. d.}]c. Disponível em: \url{https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst2960/software/release/15-0_2_se/configuration/guide/scg2960/swstp.html}. Acesso em: 1 out. 2026.
+
+CISCO SYSTEMS. Configuring VLANs. \emph{In}: CISCO SYSTEMS. \textbf{Catalyst 2960, 2960-S, 2960-C, and 2960{-}Plus Switches Software Configuration Guide, Cisco IOS Release 15.0(2)SE and Later}. San Jose: Cisco, [\emph{s. d.}]d. Disponível em: \url{https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst2960/software/release/15-0_2_se/configuration/guide/scg2960/swvlan.html}. Acesso em: 1 out. 2026.
+
+CISCO SYSTEMS. \textbf{Understanding the ping and traceroute commands}. San Jose: Cisco, [\emph{s. d.}]e. Disponível em: \url{https://www.cisco.com/c/en/us/support/docs/ios-nx-os-software/ios-software-releases-121-mainline/12778-ping-traceroute.html}. Acesso em: 1 out. 2026.
+
+FULLER, V.; LI, T. \textbf{Classless Inter-domain Routing (CIDR)}: The Internet Address Assignment and Aggregation Plan. [\emph{S. l.}]: IETF, 2006. (RFC 4632). Disponível em: \url{https://www.rfc-editor.org/rfc/rfc4632}. Acesso em: 1 out. 2026.
+
+INSTITUTE OF ELECTRICAL AND ELECTRONICS ENGINEERS. \textbf{IEEE Std 802.1Q-2018}: IEEE Standard for Local and Metropolitan Area Networks: Bridges and Bridged Networks. New York: IEEE, 2018.
+
+KUROSE, J. F.; ROSS, K. W. \textbf{Redes de computadores e a Internet}: uma abordagem top-down. 8. ed. Porto Alegre: Bookman, 2021.
+
+MOGUL, J.; POSTEL, J. \textbf{Internet Standard Subnetting Procedure}. [\emph{S. l.}]: IETF, 1985. (RFC 950). Disponível em: \url{https://www.rfc-editor.org/rfc/rfc950}. Acesso em: 1 out. 2026.
+
+PLUMMER, D. C. \textbf{An Ethernet Address Resolution Protocol}. [\emph{S. l.}]: IETF, 1982. (RFC 826). Disponível em: \url{https://www.rfc-editor.org/rfc/rfc826}. Acesso em: 1 out. 2026.
+
+POSTEL, J. \textbf{Internet Control Message Protocol}. [\emph{S. l.}]: IETF, 1981a. (RFC 792). Disponível em: \url{https://www.rfc-editor.org/rfc/rfc792}. Acesso em: 1 out. 2026.
+
+POSTEL, J. \textbf{Internet Protocol}. [\emph{S. l.}]: IETF, 1981b. (RFC 791). Disponível em: \url{https://www.rfc-editor.org/rfc/rfc791}. Acesso em: 1 out. 2026.
+
+PUMMILL, T.; MANNING, B. \textbf{Variable Length Subnet Table For IPv4}. [\emph{S. l.}]: IETF, 1995. (RFC 1878). Disponível em: \url{https://www.rfc-editor.org/rfc/rfc1878}. Acesso em: 1 out. 2026.
+
+REKHTER, Y. \emph{et al.} \textbf{Address Allocation for Private Internets}. [\emph{S. l.}]: IETF, 1996. (RFC 1918). Disponível em: \url{https://www.rfc-editor.org/rfc/rfc1918}. Acesso em: 1 out. 2026.
+
+SAUER, F. \textbf{Aula extra de endereçamento IP}. Slides da disciplina Redes I. [\emph{S. l.}], [\emph{s. d.}]a. Disponível em: \url{https://sauer.com.br/EnderecamentoIP.pdf}. Acesso em: 1 out. 2026.
+
+SAUER, F. \textbf{Camada de enlace}. Slides da aula 3 da disciplina Redes I. [\emph{S. l.}], [\emph{s. d.}]b. Disponível em: \url{https://sauer.com.br/Aula3RedesEnlace.pdf}. Acesso em: 1 out. 2026.
+
+SAUER, F. \textbf{Camada de rede}. Slides da aula 4 da disciplina Redes I. [\emph{S. l.}], [\emph{s. d.}]c. Disponível em: \url{https://sauer.com.br/Aula4RedesRede.pdf}. Acesso em: 1 out. 2026.
+
+SAUER, F. \textbf{Lab de configuração básica de rede com VLANs e VLSM}. Roteiro de laboratório da disciplina Redes I. Rio de Janeiro: UERJ-ZO, [2023?].
+
+TANENBAUM, A. S.; WETHERALL, D. \textbf{Redes de computadores}. 5. ed. São Paulo: Pearson Prentice Hall, 2011.\par
+\endgroup
+
+% ============================================================== APENDICE
+\clearpage
+\secao{APÊNDICE A: CONFIGURAÇÃO SALVA EM CADA EQUIPAMENTO}
+
+Este apêndice reproduz o texto da configuração gravada em cada equipamento do arquivo .pkt entregue. Em todos eles a startup-config é igual à running-config, como resultado do \texttt{copy running-config startup-config}. As VLANs não aparecem aqui porque ficam no arquivo \texttt{vlan.dat}, como explicado na seção 3.1.
+
+\input{apendice}
+
+\clearpage
+\secao{APÊNDICE B: TELAS DOS TESTES NO PACKET TRACER}
+
+\input{apendice_b}
+
+\vspace{10pt}
+{\small Documento construído com LaTeX.}
+
+\end{document}

@@ -1,0 +1,18 @@
+\begin{tikzpicture}[every node/.append style={execute at begin node=\setstretch{1.05}}, font=\footnotesize, x=1cm, y=1cm]
+  \def\s{0.0058824}% 9 cm para 1530 enderecos
+  \node[anchor=east, align=right] at (-0.2,1.3) {\textbf{VLSM}\\bloco /22};
+  \fill[hostblue!75] (0,1.0) rectangle (763*\s,1.6);
+  \fill[hostblue!15] (763*\s,1.0) rectangle (826*\s,1.6);
+  \draw (0,1.0) rectangle (826*\s,1.6);
+  \node[anchor=west] at (826*\s+0.15,1.3) {763 de 826 utilizáveis: \textbf{92,4\%}};
+  \node[anchor=east, align=right] at (-0.2,0) {\textbf{máscara fixa}\\/23 nas três VLANs};
+  \fill[hostblue!75] (0,-0.3) rectangle (763*\s,0.3);
+  \fill[hostblue!15] (763*\s,-0.3) rectangle (1530*\s,0.3);
+  \draw (0,-0.3) rectangle (1530*\s,0.3);
+  \node[anchor=west] at (1530*\s+0.15,0) {763 de 1530: \textbf{49,9\%}};
+  \draw[black!40] (0,-0.55) -- (0,1.85);
+  \fill[hostblue!75] (0,-1.15) rectangle (0.4,-0.9);
+  \node[anchor=west] at (0.5,-1.02) {ocupados (pontos + gateways)};
+  \fill[hostblue!15] (5.4,-1.15) rectangle (5.8,-0.9); \draw (5.4,-1.15) rectangle (5.8,-0.9);
+  \node[anchor=west] at (5.9,-1.02) {utilizáveis que sobram};
+\end{tikzpicture}

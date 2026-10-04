@@ -1,0 +1,49 @@
+\begin{tikzpicture}[every node/.append style={execute at begin node=\setstretch{1.05}}, font=\footnotesize, x=1cm, y=1cm]
+  \coordinate (R) at (7.6,0.35);
+  \coordinate (S3) at (7.6,-1.85);
+  \coordinate (S1) at (4.8,-3.55);
+  \coordinate (S2) at (10.4,-3.55);
+  \coordinate (P1) at (2.55,-1.6);  \coordinate (P2) at (2.55,-3.55); \coordinate (P3) at (2.55,-5.5);
+  \coordinate (P4) at (12.65,-1.6); \coordinate (P5) at (12.65,-3.55); \coordinate (P6) at (12.65,-5.5);
+  % troncos 802.1Q (tres VLANs) e enlaces de acesso (uma VLAN)
+  \tronco{R}{S3}
+  \tronco{S3}{S1}
+  \tronco{S3}{S2}
+  \draw[vprof, line width=1pt] (S1) -- (P1);  \draw[valun, line width=1pt] (S1) -- (P2);  \draw[vvisi, line width=1pt] (S1) -- (P3);
+  \draw[vprof, line width=1pt] (S2) -- (P4);  \draw[valun, line width=1pt] (S2) -- (P5);  \draw[vvisi, line width=1pt] (S2) -- (P6);
+  % nomes das portas
+  \node[porta] at ($(R)!0.36!(S3)$) [right=3pt] {G0/0/0};
+  \node[porta] at ($(R)!0.74!(S3)$) [right=3pt] {Gig0/1};
+  \node[porta] at ($(S3)!0.47!(S1)$) [above=5pt] {F0/1};
+  \node[porta] at ($(S3)!0.80!(S1)$) [above=5pt] {F0/1};
+  \node[porta] at ($(S3)!0.47!(S2)$) [above=5pt] {F0/3};
+  \node[porta] at ($(S3)!0.80!(S2)$) [above=5pt] {F0/3};
+  \path (S1) -- node[pos=0.42, sloped, above=1pt, porta] {F0/11} (P1);
+  \path (S1) -- node[pos=0.52, above=1pt, porta] {F0/18} (P2);
+  \path (S1) -- node[pos=0.45, sloped, below=1pt, porta] {F0/6} (P3);
+  \path (S2) -- node[pos=0.42, sloped, above=1pt, porta] {F0/11} (P4);
+  \path (S2) -- node[pos=0.52, above=1pt, porta] {F0/18} (P5);
+  \path (S2) -- node[pos=0.45, sloped, below=1pt, porta] {F0/6} (P6);
+  % icones
+  \pic at (R) {rt};   \node[left=0.45cm of R, align=right] {\textbf{Roteador}\\ISR 4331};
+  \pic at (S3) {sw};  \node[right=0.62cm of S3] {\textbf{SW3}};
+  \pic at (S1) {sw};  \node[below=0.27cm of S1] {\textbf{SW1}};
+  \pic at (S2) {sw};  \node[below=0.27cm of S2] {\textbf{SW2}};
+  \foreach \p/\n in {P1/PC1,P2/PC2,P3/PC3,P4/PC4,P5/PC5,P6/PC6}{\pic at (\p) {pc}; \node[below=0.24cm of \p] {\textbf{\n}};}
+  % quadros com os mesmos dados das notas gravadas no .pkt
+  \node[info, draw=vprof, anchor=east] at ($(P1)+(-0.55,0)$) {\textbf{Professor, VLAN 10}\\192.168.3.0/26\\GW 192.168.3.1\\PC1: 192.168.3.10};
+  \node[info, draw=valun, anchor=east] at ($(P2)+(-0.55,0)$) {\textbf{Aluno, VLAN 20}\\192.168.2.0/24\\GW 192.168.2.1\\PC2: 192.168.2.10};
+  \node[info, draw=vvisi, anchor=east] at ($(P3)+(-0.55,0)$) {\textbf{Visita, VLAN 30}\\192.168.0.0/23\\GW 192.168.0.1\\PC3: 192.168.0.10};
+  \node[info, draw=vprof, anchor=west] at ($(P4)+(0.55,0)$) {\textbf{Professor, VLAN 10}\\192.168.3.0/26\\GW 192.168.3.1\\PC4: 192.168.3.11};
+  \node[info, draw=valun, anchor=west] at ($(P5)+(0.55,0)$) {\textbf{Aluno, VLAN 20}\\192.168.2.0/24\\GW 192.168.2.1\\PC5: 192.168.2.11};
+  \node[info, draw=vvisi, anchor=west] at ($(P6)+(0.55,0)$) {\textbf{Visita, VLAN 30}\\192.168.0.0/23\\GW 192.168.0.1\\PC6: 192.168.1.10};
+  \node[info, draw=gray, anchor=west, text width=3.45cm] at ($(R)+(0.95,0)$) {\textbf{Subinterfaces da G0/0/0}\\G0/0/0.10: 192.168.3.1 /26\\G0/0/0.20: 192.168.2.1 /24\\G0/0/0.30: 192.168.0.1 /23};
+  % legenda
+  \begin{scope}[shift={(1.6,-6.85)}]
+    \draw[vprof, line width=1pt] (0,0) -- (0.6,0);   \node[anchor=west] at (0.7,0) {VLAN 10};
+    \draw[valun, line width=1pt] (2.5,0) -- (3.1,0); \node[anchor=west] at (3.2,0) {VLAN 20};
+    \draw[vvisi, line width=1pt] (5.0,0) -- (5.6,0); \node[anchor=west] at (5.7,0) {VLAN 30};
+    \coordinate (ta) at (7.5,0); \coordinate (tb) at (8.1,0); \tronco{ta}{tb}
+    \node[anchor=west] at (8.2,0) {tronco 802.1Q (VLANs 10, 20 e 30)};
+  \end{scope}
+\end{tikzpicture}

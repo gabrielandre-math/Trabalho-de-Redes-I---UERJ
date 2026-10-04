@@ -1,0 +1,47 @@
+\begin{tikzpicture}[every node/.append style={execute at begin node=\setstretch{1.0}}, font=\footnotesize, x=1cm, y=1cm,
+  cab/.style={draw, rounded corners=1.5pt, align=center, inner sep=3pt, minimum width=2.4cm, fill=white, line width=0.8pt},
+  arp/.style={-{Stealth[length=5pt]}, densely dashed, line width=0.9pt},
+  icmp/.style={-{Stealth[length=5pt]}, line width=0.9pt},
+  msg/.style={fill=white, inner sep=1.2pt, align=center, above=2.5pt},
+  nota/.style={draw=black!40, fill=black!4, rounded corners=1pt, inner sep=2pt, align=center, font=\footnotesize}]
+  % participantes
+  \def\xa{0} \def\xb{3.4} \def\xr{7.6} \def\xc{11.8} \def\xd{15.0}
+  \node[cab, draw=vprof] (h4) at (\xa,0) {\textbf{PC4}\\192.168.3.11};
+  \node[cab, draw=vprof] (h1) at (\xb,0) {\textbf{PC1}\\192.168.3.10};
+  \node[cab, draw=black!60] (hr) at (\xr,0) {\textbf{Roteador}\\G0/0/0.10 e .20};
+  \node[cab, draw=valun] (h5) at (\xc,0) {\textbf{PC5}\\192.168.2.11};
+  \node[cab, draw=valun] (h2) at (\xd,0) {\textbf{PC2}\\192.168.2.10};
+  \foreach \x in {\xa,\xb,\xr,\xc,\xd} \draw[black!30, dashed] (\x,-0.5) -- (\x,-10.3);
+  % 1: ARP do PC1 em broadcast na VLAN 10
+  \draw[arp, vprof] (\xb,-1.1) -- node[msg] {1. ARP: quem tem 192.168.3.1?} (\xr,-1.1);
+  \draw[arp, vprof] (\xb,-1.1) -- node[msg] {1. (broadcast)} (\xa,-1.1);
+  \node[nota, anchor=north] at (\xa,-1.25) {PC4 descarta};
+  % 2: resposta do roteador
+  \draw[arp, vprof] (\xr,-2.0) -- node[msg] {2. ARP: é o MAC 0006.2A62.1301} (\xb,-2.0);
+  % 3: primeiro echo request
+  \draw[icmp, vprof] (\xb,-2.9) -- node[msg] {3. echo request 1 (tag 10)} (\xr,-2.9);
+  % 4: ARP do roteador em broadcast na VLAN 20
+  \draw[arp, valun] (\xr,-3.8) -- node[msg, pos=0.86] {4. (broadcast)} (\xd,-3.8);
+  \draw[arp, valun] (\xr,-3.8) -- node[msg] {4. ARP: quem tem 192.168.2.11?} (\xc,-3.8);
+  \node[nota, anchor=north] at (\xd,-3.95) {PC2 descarta};
+  \node[nota, anchor=east, draw=red!60!black, fill=red!8] at (\xr-0.15,-3.8) {echo 1 descartado};
+  % 5: resposta do PC5
+  \draw[arp, valun] (\xc,-4.7) -- node[msg] {5. ARP: é o MAC 0006.2A48.1D01} (\xr,-4.7);
+  % timeout no PC1
+  \node[nota, anchor=north, draw=red!60!black, fill=red!8] at (\xb,-5.25) {1º ping: timeout};
+  % 6 a 9: segundo ping completo
+  \draw[icmp, vprof] (\xb,-6.4) -- node[msg] {6. echo request 2 (tag 10)} (\xr,-6.4);
+  \draw[icmp, valun] (\xr,-7.3) -- node[msg] {7. echo request 2 (tag 20, TTL 127)} (\xc,-7.3);
+  \draw[icmp, valun] (\xc,-8.2) -- node[msg] {8. echo reply (tag 20)} (\xr,-8.2);
+  \draw[icmp, vprof] (\xr,-9.1) -- node[msg] {9. echo reply (tag 10, TTL 127)} (\xb,-9.1);
+  % o que o roteador faz entre as mensagens 6 e 7
+  \node[nota, anchor=east, align=left] at (\xr-0.2,-7.75) {entre 6 e 7 o roteador troca\\a tag 10 pela 20 e diminui o TTL};
+  % legenda
+  \begin{scope}[shift={(0.4,-10.85)}]
+    \draw[arp] (0,0) -- (0.9,0); \node[anchor=west] at (1.0,0) {ARP};
+    \draw[icmp] (2.4,0) -- (3.3,0); \node[anchor=west] at (3.4,0) {ICMP (ping)};
+    \draw[vprof, line width=1.4pt] (5.6,0) -- (6.3,0); \node[anchor=west] at (6.4,0) {VLAN 10};
+    \draw[valun, line width=1.4pt] (8.0,0) -- (8.7,0); \node[anchor=west] at (8.8,0) {VLAN 20};
+    \node[anchor=west, text=black!65] at (10.5,0) {tag: só nos troncos};
+  \end{scope}
+\end{tikzpicture}

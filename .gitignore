@@ -1,0 +1,11 @@
+# arquivos gerados pelo LaTeX
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+relatorio/latex/relatorio.pdf

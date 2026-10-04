@@ -1,0 +1,32 @@
+\begin{tikzpicture}[every node/.append style={execute at begin node=\setstretch{1.05}}, font=\small,
+  campo/.style={draw, minimum height=0.95cm, align=center, inner sep=2pt, text height=1.7ex, text depth=0.45ex},
+  tam/.style={font=\footnotesize, text=black!65},
+  bits/.style={font=\footnotesize\ttfamily, text=hostblue}]
+  % quadro Ethernet com tag
+  \node[campo, minimum width=2.3cm] (dst) at (1.15,0) {Destino};
+  \node[campo, minimum width=2.3cm, right=0pt of dst] (src) {Origem};
+  \node[campo, minimum width=2.5cm, right=0pt of src, fill=hostblue!15, very thick] (tag) {Tag 802.1Q};
+  \node[campo, minimum width=1.7cm, right=0pt of tag] (tipo) {Tipo};
+  \node[campo, minimum width=4.2cm, right=0pt of tipo] (dados) {Dados};
+  \node[campo, minimum width=1.6cm, right=0pt of dados] (fcs) {FCS};
+  \foreach \n/\t in {dst/6 bytes, src/6 bytes, tag/4 bytes, tipo/2 bytes, dados/46 a 1500 bytes, fcs/4 bytes}
+    \node[tam, above=1pt of \n] {\t};
+  % detalhe dos 4 bytes da tag
+  \node[campo, minimum width=4.4cm, anchor=north west] (tpid) at ($(dst.south west)+(1.0,-1.55)$) {TPID};
+  \node[campo, minimum width=1.4cm, right=0pt of tpid] (pcp) {PCP};
+  \node[campo, minimum width=1.1cm, right=0pt of pcp] (dei) {DEI};
+  \node[campo, minimum width=4.6cm, right=0pt of dei, fill=hostblue!15] (vid) {VID (número da VLAN)};
+  \draw[gray] (tag.south west) -- (tpid.north west);
+  \draw[gray] (tag.south east) -- (vid.north east);
+  \draw[decorate, decoration={brace, amplitude=4pt}, black!60] ($(pcp.north west)+(0,0.08)$) -- node[above=3pt, tam] {TCI: 16 bits} ($(vid.north east)+(0,0.08)$);
+  % bits do exemplo: quadro da VLAN 10
+  \node[bits, below=3pt of tpid] (b1) {1000 0001 0000 0000};
+  \node[bits, below=3pt of pcp] {000};
+  \node[bits, below=3pt of dei] {0};
+  \node[bits, below=3pt of vid] (b4) {0000 0000 1010};
+  \node[tam, below=1pt of b1] {16 bits = 0x8100};
+  \node[tam] at (pcp |- b1.south) [below=1pt] {3 bits};
+  \node[tam] at (dei |- b1.south) [below=1pt] {1 bit};
+  \node[tam, below=1pt of b4] {12 bits = 10};
+  \node[font=\footnotesize, anchor=east, align=right, text=hostblue] at ($(tpid.west |- b1)+(-0.15,0)$) {exemplo:\\VLAN 10};
+\end{tikzpicture}

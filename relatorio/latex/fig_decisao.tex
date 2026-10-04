@@ -1,0 +1,21 @@
+\begin{tikzpicture}[every node/.append style={execute at begin node=\setstretch{1.05}}, font=\small, x=1cm, y=1cm,
+  passo/.style={draw, rounded corners=2pt, align=center, inner sep=4pt, text width=5.0cm, fill=white, minimum height=0.9cm},
+  decisao/.style={draw, diamond, aspect=2.8, align=center, inner sep=0pt, text width=2.9cm, fill=white},
+  ex/.style={font=\footnotesize, text=black!60, align=center, text width=5.0cm},
+  seta/.style={-{Stealth[length=5pt]}, thick}]
+  \node[passo] (ini) at (0,0) {o PC tem um pacote para um IP de destino};
+  \node[passo] (and) at (0,-1.35) {AND entre o IP de destino e a máscara do próprio PC};
+  \node[decisao] (dec) at (0,-3.05) {o resultado é a rede do próprio PC?};
+  \node[passo, fill=valun!8] (arpd) at (-3.6,-4.75) {ARP pelo IP do \textbf{destino}};
+  \node[passo, fill=hostblue!8] (arpg) at (3.6,-4.75) {ARP pelo IP do \textbf{gateway}};
+  \node[passo] (envd) at (-3.6,-6.15) {quadro vai direto para o MAC do destino, sem passar pelo roteador};
+  \node[passo] (envg) at (3.6,-6.15) {quadro vai para o MAC do gateway; o IP de destino não muda};
+  \node[ex, below=3pt of envd] {exemplo: PC1 para PC4\\(o AND resulta em 192.168.3.0, a rede do PC1)};
+  \node[ex, below=3pt of envg] {exemplo: PC1 para PC5\\(o AND resulta em 192.168.2.0, outra rede)};
+  \draw[seta] (ini) -- (and);
+  \draw[seta] (and) -- (dec);
+  \draw[seta] (dec.west) -| node[above, pos=0.35] {sim} (arpd.north);
+  \draw[seta] (dec.east) -| node[above, pos=0.35] {não} (arpg.north);
+  \draw[seta] (arpd) -- (envd);
+  \draw[seta] (arpg) -- (envg);
+\end{tikzpicture}

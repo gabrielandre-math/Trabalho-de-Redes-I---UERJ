@@ -1,0 +1,20 @@
+Relatorio do Lab de configuracao basica de rede com VLANs e VLSM
+Gabriel Andre de Lima Silva, Redes I, Prof. Fred Sauer
+
+Codigo-fonte LaTeX do relatorio. Compilar com XeLaTeX, rodando tres vezes
+para atualizar sumario, listas e referencias cruzadas:
+
+  xelatex relatorio.tex
+  xelatex relatorio.tex
+  xelatex relatorio.tex
+
+No Overleaf, escolha o compilador XeLaTeX nas configuracoes do projeto.
+
+Arquivos:
+  relatorio.tex   texto do relatorio
+  preamble.tex    pacotes, formatacao e estilos dos diagramas
+  apendice.tex    configuracao salva em cada equipamento (tirada do .pkt)
+  apendice_b.tex  telas dos testes no Packet Tracer (imagens em prints/)
+  fig_*.tex       diagramas desenhados em TikZ
+  tab_*.tex       tabelas com as contas em binario
+  logo_uerj.pdf   logo da capa

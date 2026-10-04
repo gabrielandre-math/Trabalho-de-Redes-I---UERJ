@@ -1,0 +1,140 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{fontspec}
+% Liberation Sans tem as medidas da Arial; sem ela, usa a TeX Gyre Heros
+\IfFontExistsTF{Liberation Sans}{\setmainfont{Liberation Sans}}{\setmainfont{TeX Gyre Heros}}
+\IfFontExistsTF{Liberation Mono}{\setmonofont{Liberation Mono}}{\setmonofont{TeX Gyre Cursor}}
+\usepackage{polyglossia}
+\setdefaultlanguage[variant=brazilian]{portuguese}
+\usepackage[left=3cm,right=2cm,top=3cm,bottom=2cm,headsep=0.8cm]{geometry}
+\usepackage{setspace}
+\setstretch{1.35}
+\setlength{\parindent}{0pt}
+\setlength{\emergencystretch}{2.5em}
+\setlength{\parskip}{6pt plus 1pt}
+\usepackage{graphicx}
+\usepackage[table]{xcolor}
+\usepackage{array,booktabs,tabularx,multirow,makecell}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{caption}
+\usepackage{float}
+\usepackage[section,above]{placeins}
+\usepackage{flafter}
+\usepackage{fancyvrb}
+\usepackage{multicol}
+\setlength{\columnsep}{0.8cm}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{positioning,calc,arrows.meta,fit,backgrounds,shapes.geometric,decorations.pathreplacing}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\urlstyle{same}
+\hypersetup{pdftitle={Lab de configuração básica de rede com VLANs e VLSM},
+  pdfauthor={Gabriel André de Lima Silva},
+  pdfsubject={Atividade de Redes I, Professor Fred Sauer}}
+
+\definecolor{hostblue}{HTML}{2F5DA8}
+\definecolor{vprof}{HTML}{1F5FAD}
+\definecolor{valun}{HTML}{2E7D32}
+\definecolor{vvisi}{HTML}{B85C00}
+\definecolor{gridgray}{gray}{0.72}
+\newcommand{\hb}[1]{\textcolor{hostblue}{#1}}
+
+% cabecalho: numero da pagina no canto superior direito
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0pt}
+
+% titulos
+\titleformat{\section}{\normalfont\bfseries}{}{0pt}{}
+\titleformat{\subsection}{\normalfont\bfseries}{}{0pt}{}
+\titleformat{\subsubsection}{\normalfont\bfseries}{}{0pt}{}
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+\titlespacing*{\subsubsection}{0pt}{8pt}{2pt}
+\newcommand{\secao}[1]{\section*{#1}\phantomsection\addcontentsline{toc}{section}{#1}}
+\newcommand{\subsecao}[1]{\subsection*{#1}\phantomsection\addcontentsline{toc}{subsection}{#1}}
+
+% sumario
+\renewcommand{\cfttoctitlefont}{\hfill\normalsize\bfseries}
+\renewcommand{\cftaftertoctitle}{\hfill}
+\setlength{\cftbeforetoctitleskip}{0pt}
+\setlength{\cftaftertoctitleskip}{14pt}
+\renewcommand{\cftsecfont}{\small\bfseries}
+\renewcommand{\cftsecpagefont}{\small\bfseries}
+\renewcommand{\cftsubsecfont}{\small}
+\renewcommand{\cftsubsecpagefont}{\small}
+\renewcommand{\cftsecleader}{\bfseries\cftdotfill{\cftdotsep}}
+\setlength{\cftbeforesecskip}{2pt}
+\setlength{\cftsubsecindent}{1.2em}
+\setlength{\cftsecindent}{0pt}
+
+% legendas: "Tabela 1: ..." acima, fonte embaixo
+\captionsetup{font=small,labelsep=colon,justification=raggedright,singlelinecheck=false,skip=3pt}
+\captionsetup[table]{position=top}
+\newcommand{\fonte}{\par\vspace{1pt}{\small Fonte: elaborado pelo autor.}\par}
+\newcommand{\fontebase}[1]{\par\vspace{1pt}{\small Fonte: elaborado pelo autor com base em #1.}\par}
+\newcommand{\fonteprint}{\par\vspace{1pt}{\small Fonte: captura de tela do Cisco Packet Tracer feita pelo autor.}\par}
+\newcommand{\fonteadapt}{\par\vspace{1pt}{\small Fonte: adaptado de Sauer ([\emph{s. d.}]a).}\par}
+
+% tabela de contas em binario (grade cinza, cabecalho sombreado)
+\newenvironment{bintab}{%
+  \par\vspace{2pt}\noindent\begingroup\small\arrayrulecolor{gridgray}\renewcommand{\arraystretch}{1.25}%
+  \begin{tabular}{|l|l|l|}\hline
+  \rowcolor{gray!14} & \multicolumn{1}{c|}{\bfseries Binário (rede | host)} & \multicolumn{1}{c|}{\bfseries Decimal}\\ \hline}
+ {\end{tabular}\endgroup\par\vspace{6pt}}
+\newenvironment{andtab}{%
+  \par\vspace{2pt}\noindent\begingroup\small\renewcommand{\arraystretch}{1.15}\begin{tabular}{@{}l@{\hspace{1em}}l@{\hspace{1em}}l@{}}}
+ {\end{tabular}\endgroup\par\vspace{6pt}}
+\newenvironment{somatab}{%
+  \par\vspace{2pt}\noindent\begingroup\small\renewcommand{\arraystretch}{1.15}\begin{tabular}{@{}l@{\hspace{0.6em}}r@{\hspace{1em}}l@{}}}
+ {\end{tabular}\endgroup\par\vspace{6pt}}
+
+% blocos de comandos
+\DefineVerbatimEnvironment{cmd}{Verbatim}{fontsize=\small,xleftmargin=1.2em,frame=leftline,framerule=0.6pt,rulecolor=\color{gray!60},framesep=8pt,samepage=true,baselinestretch=1.08}
+\DefineVerbatimEnvironment{conf}{Verbatim}{fontsize=\scriptsize,baselinestretch=1.0}
+\DefineVerbatimEnvironment{saida}{Verbatim}{fontsize=\footnotesize,xleftmargin=0.4em,frame=single,rulecolor=\color{gray!50},framesep=6pt,samepage=true,baselinestretch=1.0}
+
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\setlength{\cftfigindent}{0pt}
+
+% icones e estilos comuns aos diagramas
+\tikzset{
+  sw/.pic={\draw[fill=white, rounded corners=2pt] (-0.55,-0.22) rectangle (0.55,0.22);
+           \draw[-{Stealth[length=3pt]}] (-0.32,0.07) -- (0.32,0.07);
+           \draw[-{Stealth[length=3pt]}] (0.32,-0.07) -- (-0.32,-0.07);},
+  rt/.pic={\draw[fill=white] (0,0) circle (0.36);
+           \draw[{Stealth[length=3pt]}-{Stealth[length=3pt]}] (-0.22,-0.22) -- (0.22,0.22);
+           \draw[{Stealth[length=3pt]}-{Stealth[length=3pt]}] (-0.22,0.22) -- (0.22,-0.22);},
+  pc/.pic={\draw[fill=white, rounded corners=1pt] (-0.32,-0.12) rectangle (0.32,0.30);
+           \draw (0,-0.12) -- (0,-0.22); \draw (-0.16,-0.24) -- (0.16,-0.24);},
+  porta/.style={font=\scriptsize, text=black!80, fill=white, inner sep=0.6pt},
+  info/.style={draw, rounded corners=1.5pt, align=left, font=\scriptsize, inner sep=3pt,
+               line width=0.6pt, text width=2.65cm},
+}
+% tronco 802.1Q: tres linhas paralelas, uma por VLAN
+\newcommand{\tronco}[2]{%
+  \draw[vvisi, line width=0.9pt] ($(#1)!1.8pt!90:(#2)$) -- ($(#2)!1.8pt!-90:(#1)$);
+  \draw[valun, line width=0.9pt] (#1) -- (#2);
+  \draw[vprof, line width=0.9pt] ($(#1)!1.8pt!-90:(#2)$) -- ($(#2)!1.8pt!90:(#1)$);}
+
+% listas de figuras e de tabelas
+\tocloftpagestyle{empty}
+\renewcommand{\cftloftitlefont}{\hfill\normalsize\bfseries}
+\renewcommand{\cftafterloftitle}{\hfill}
+\renewcommand{\cftlottitlefont}{\hfill\normalsize\bfseries}
+\renewcommand{\cftafterlottitle}{\hfill}
+\setlength{\cftbeforeloftitleskip}{0pt}
+\setlength{\cftafterloftitleskip}{14pt}
+\setlength{\cftbeforelottitleskip}{0pt}
+\setlength{\cftafterlottitleskip}{14pt}
+\renewcommand{\cftfigpresnum}{Figura~}
+\renewcommand{\cftfigaftersnum}{:}
+\setlength{\cftfignumwidth}{5.6em}
+\renewcommand{\cfttabpresnum}{Tabela~}
+\renewcommand{\cfttabaftersnum}{:}
+\setlength{\cfttabnumwidth}{5.6em}
+\setlength{\cftbeforefigskip}{3pt}
+\setlength{\cftbeforetabskip}{3pt}
