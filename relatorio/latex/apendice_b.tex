@@ -20,7 +20,7 @@ Nos três switches o \texttt{show vlan brief} lista as VLANs 10 (professor), 20 
 \captionsetup{position=top}
 \caption{SW1: show vlan brief e show interfaces trunk}\label{fig:print-sw1}
 \centering
-\includegraphics[width=0.70\textwidth]{prints/sw1.png}
+\includegraphics[width=0.88\textwidth]{prints/sw1.png}
 \fonteprint
 \end{figure}
 
@@ -28,7 +28,7 @@ Nos três switches o \texttt{show vlan brief} lista as VLANs 10 (professor), 20 
 \captionsetup{position=top}
 \caption{SW2: show vlan brief e show interfaces trunk}\label{fig:print-sw2}
 \centering
-\includegraphics[width=0.70\textwidth]{prints/sw2.png}
+\includegraphics[width=0.88\textwidth]{prints/sw2.png}
 \fonteprint
 \end{figure}
 
@@ -36,7 +36,7 @@ Nos três switches o \texttt{show vlan brief} lista as VLANs 10 (professor), 20 
 \captionsetup{position=top}
 \caption{SW3: show vlan brief e show interfaces trunk}\label{fig:print-sw3}
 \centering
-\includegraphics[width=0.70\textwidth]{prints/sw3.png}
+\includegraphics[width=0.88\textwidth]{prints/sw3.png}
 \fonteprint
 \end{figure}
 
@@ -48,7 +48,7 @@ O \texttt{show ip interface brief} mostra a G0/0/0 e as três subinterfaces \emp
 \captionsetup{position=top}
 \caption{roteador: show ip interface brief e show ip route}\label{fig:print-rot}
 \centering
-\includegraphics[width=0.78\textwidth]{prints/roteador.png}
+\includegraphics[width=0.92\textwidth]{prints/roteador.png}
 \fonteprint
 \end{figure}
 
@@ -60,7 +60,7 @@ No PC1 (VLAN 10), o ping para o PC4 (192.168.3.11, mesma VLAN) responde com TTL=
 \captionsetup{position=top}
 \caption{PC1: ping para o PC4, ping para o PC5 e tracert para o PC5}\label{fig:print-pc1}
 \centering
-\includegraphics[width=0.62\textwidth]{prints/pc1.png}
+\includegraphics[width=0.80\textwidth]{prints/pc1.png}
 \fonteprint
 \end{figure}
 
@@ -68,19 +68,19 @@ No PC3 (VLAN 30, 192.168.0.10/23), o tracert para o PC6 (192.168.1.10) tem um sa
 
 \begin{figure}[H]
 \captionsetup{position=top}
-\caption{PC3: ipconfig, tracert para o PC6 e ping para o PC1}\label{fig:print-pc3}
+\caption{PC3: fim do ipconfig, tracert para o PC6 e ping para o PC1}\label{fig:print-pc3}
 \centering
-\includegraphics[width=0.62\textwidth]{prints/pc3.png}
+\includegraphics[width=0.80\textwidth]{prints/pc3.png}
 \fonteprint
 \end{figure}
 
-No PC6 (VLAN 30, 192.168.1.10/23), o tracert para o PC2 (192.168.2.10) passa pelo gateway 192.168.0.1 e chega ao destino. O asterisco na primeira medida do segundo salto é o pacote descartado enquanto o roteador resolvia o MAC do PC2 por ARP. O ping para o próprio gateway responde com TTL=255, o TTL inicial do roteador.
+No PC6 (VLAN 30, 192.168.1.10/23), o tracert para o PC2 (192.168.2.10) passa pelo gateway 192.168.0.1 e chega ao destino. O ping para o próprio gateway responde com TTL=255, o TTL inicial do roteador.
 
 \begin{figure}[H]
 \captionsetup{position=top}
 \caption{PC6: ipconfig, tracert para o PC2 e ping para o gateway}\label{fig:print-pc6}
 \centering
-\includegraphics[width=0.62\textwidth]{prints/pc6.png}
+\includegraphics[width=0.80\textwidth]{prints/pc6.png}
 \fonteprint
 \end{figure}
 
@@ -92,7 +92,7 @@ Com o cenário recém-reiniciado e o filtro em ARP e ICMP, fiz o ping do PC1 par
 \captionsetup{position=top}
 \caption{lista de eventos: ARP do PC1 na VLAN 10 e ARP do roteador na VLAN 20}\label{fig:print-sim1}
 \centering
-\includegraphics[width=0.88\textwidth]{prints/sim1.png}
+\includegraphics[width=0.70\textwidth]{prints/sim1.png}
 \fonteprint
 \end{figure}
 
@@ -102,6 +102,6 @@ A Figura~\ref{fig:print-sim2} mostra o segundo ping completo: PC1, SW1, SW3, rot
 \captionsetup{position=top}
 \caption{lista de eventos: echo request e echo reply passando pelo roteador}\label{fig:print-sim2}
 \centering
-\includegraphics[width=0.88\textwidth]{prints/sim2.png}
+\includegraphics[width=0.70\textwidth]{prints/sim2.png}
 \fonteprint
 \end{figure}

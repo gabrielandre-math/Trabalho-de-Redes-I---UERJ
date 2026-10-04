@@ -18,3 +18,4 @@ Arquivos:
   fig_*.tex       diagramas desenhados em TikZ
   tab_*.tex       tabelas com as contas em binario
   logo_uerj.pdf   logo da capa
+  github-mark.pdf icone do GitHub usado na capa e no cabecalho
